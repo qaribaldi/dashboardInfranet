@@ -17,3 +17,6 @@ Route::prefix('inventory')->group(function () {
     Route::resource('printer', AssetPrinterController::class);
     Route::resource('proyektor', AssetProyektorController::class);
 });
+
+// JSON metrics untuk DSS
+Route::get('/dashboard/metrics', [DashboardController::class, 'metrics'])->name('dashboard.metrics');
