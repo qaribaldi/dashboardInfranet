@@ -18,6 +18,12 @@
       @endforeach
     </div>
 
+    <div>
+  <label class="block text-sm font-medium mb-1" for="catatan_histori">Catatan Histori</label>
+  <textarea id="catatan_histori" name="catatan_histori" class="w-full rounded-lg border border-gray-300 px-3 py-2" rows="3" placeholder="Misal: Upgrade RAM dari 8GB ke 16GB, ganti SSD, perbaikan PSU, dll.">{{ old('catatan_histori') }}</textarea>
+</div>
+
+
     <div class="flex items-center gap-3">
       <button class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
         {{ $mode === 'create' ? 'Simpan' : 'Update' }}

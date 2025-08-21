@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetPc;
+use App\Models\AssetHistory; 
 use Illuminate\Http\Request;
 
 class AssetPcController extends Controller
@@ -90,9 +91,51 @@ class AssetPcController extends Controller
         $request->validate([
             'id_pc' => 'required|string|unique:asset_pc,id_pc,'.$pc->id_pc.',id_pc',
             'tahun_pembelian' => 'nullable|integer',
+            'catatan_histori' => 'nullable|string', // optional note
         ]);
 
-        $pc->update($request->only($pc->getFillable()));
+        // Ambil input yang diizinkan & simpan nilai lama untuk pembanding
+        $input = $request->only($pc->getFillable());
+        $before = $pc->only(array_keys($input)); // nilai lama (sebelum di-fill)
+
+        // Fill ke model TANPA save dulu → cek field yang berubah
+        $pc->fill($input);
+        $dirty = $pc->getDirty(); // array [field => newValue] yang berubah
+
+        // Tentukan jenis aksi (upgrade/repair/update)
+        // Catatan: tabel PC default tidak ada kolom 'kondisi', jadi repairFields kosong.
+        $upgradeFields = ['processor','total_kapasitas_ram','storage_1','storage_2','storage_3','operating_sistem','merk'];
+        $repairFields  = []; // tambahkan kalau nanti ada kolom perbaikan seperti 'kondisi'
+
+        $action = 'update';
+        $dirtyKeys = array_keys($dirty);
+        if (count(array_intersect($dirtyKeys, $upgradeFields)) > 0) {
+            $action = 'upgrade';
+        } elseif (count(array_intersect($dirtyKeys, $repairFields)) > 0) {
+            $action = 'repair';
+        }
+
+        // Siapkan ringkasan perubahan old -> new untuk disimpan ke history
+        $changes = [];
+        foreach ($dirty as $k => $newVal) {
+            $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
+        }
+
+        // Simpan perubahan ke DB
+        $pc->save();
+
+        // Jika ada perubahan, catat ke tabel history
+        if (!empty($dirty)) {
+            AssetHistory::create([
+                'asset_type'   => 'pc',
+                'asset_id'     => $pc->id_pc,
+                'action'       => $action,
+                'changes_json' => $changes,
+                'note'         => $request->input('catatan_histori'),
+                'created_at'   => now('Asia/Jakarta'),
+            ]);
+        }
+
         return redirect()->route('pc.index')->with('success','Aset PC berhasil diperbarui.');
     }
 
@@ -102,11 +145,9 @@ class AssetPcController extends Controller
         return redirect()->route('pc.index')->with('success','Aset PC berhasil dihapus.');
     }
 
-    // optional: show
+    // show untuk modal detail (partial)
     public function show(AssetPc $pc)
-{
-    // Kirim semua kolom ke view detail
-    return view('inventory.pc._detail', ['data' => $pc]);
-}
-
+    {
+        return view('inventory.pc._detail', ['data' => $pc]);
+    }
 }

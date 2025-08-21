@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetProyektor;
+use App\Models\AssetHistory; // <— tambahkan
 use Illuminate\Http\Request;
 
 class AssetProyektorController extends Controller
@@ -66,9 +67,50 @@ class AssetProyektorController extends Controller
         $request->validate([
             'id_proyektor' => 'required|string|unique:asset_proyektor,id_proyektor,'.$proyektor->id_proyektor.',id_proyektor',
             'tahun_pembelian' => 'nullable|integer',
+            'catatan_histori' => 'nullable|string', // opsional
         ]);
 
-        $proyektor->update($request->only($proyektor->getFillable()));
+        // Ambil input yang diizinkan & nilai lama (before)
+        $input  = $request->only($proyektor->getFillable());
+        $before = $proyektor->only(array_keys($input));
+
+        // Fill tanpa save → deteksi perbedaan
+        $proyektor->fill($input);
+        $dirty = $proyektor->getDirty(); // [field => newVal]
+
+        // Tentukan jenis aksi
+        $upgradeFields = ['merk','tipe_proyektor','resolusi_max','vga_support','hdmi_support','kabel_hdmi','remote'];
+        $repairFields  = []; // tambahkan kalau ada kolom 'kondisi' di masa depan
+
+        $action = 'update';
+        $dirtyKeys = array_keys($dirty);
+        if (count(array_intersect($dirtyKeys, $upgradeFields)) > 0) {
+            $action = 'upgrade';
+        } elseif (count(array_intersect($dirtyKeys, $repairFields)) > 0) {
+            $action = 'repair';
+        }
+
+        // Ringkasan perubahan old -> new
+        $changes = [];
+        foreach ($dirty as $k => $newVal) {
+            $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
+        }
+
+        // Simpan perubahan
+        $proyektor->save();
+
+        // Catat histori jika ada perubahan
+        if (!empty($dirty)) {
+            AssetHistory::create([
+                'asset_type'   => 'proyektor',
+                'asset_id'     => $proyektor->id_proyektor,
+                'action'       => $action,
+                'changes_json' => $changes,
+                'note'         => $request->input('catatan_histori'),
+                'created_at'   => now('Asia/Jakarta'),
+            ]);
+        }
+
         return redirect()->route('proyektor.index')->with('success','Proyektor berhasil diperbarui.');
     }
 
@@ -79,8 +121,7 @@ class AssetProyektorController extends Controller
     }
 
     public function show(AssetProyektor $proyektor)
-{
-    return view('inventory.proyektor._detail', ['data' => $proyektor]);
-}
-
+    {
+        return view('inventory.proyektor._detail', ['data' => $proyektor]);
+    }
 }

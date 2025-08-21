@@ -101,6 +101,30 @@
       </div>
     </div>
   </div>
+
+  {{-- Histori Perbaikan/Upgrade (30 hari) --}}
+  <div class="mt-6 rounded-xl border bg-white">
+    <div class="border-b px-4 py-3 flex items-center justify-between">
+      <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
+      <span class="text-xs text-gray-500">Auto-refresh</span>
+    </div>
+    <div class="p-4 overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="text-left px-3 py-2">Waktu</th>
+            <th class="text-left px-3 py-2">Aset</th>
+            <th class="text-left px-3 py-2">Aksi</th>
+            <th class="text-left px-3 py-2">Perubahan</th>
+            <th class="text-left px-3 py-2">Catatan</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 @endsection
 
 @push('body-end')
@@ -217,6 +241,30 @@
     `).join('');
   }
 
+  function updateHistory(m) {
+    const body = document.getElementById('historyBody');
+    const list = m.history || [];
+    if (!list.length) {
+      body.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Belum ada histori 30 hari terakhir.</td></tr>`;
+      return;
+    }
+    const dt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    body.innerHTML = list.map(h => `
+      <tr class="border-t align-top">
+        <td class="px-3 py-2 whitespace-nowrap">${h.ts ? dt.format(new Date(h.ts)) : '-'}</td>
+        <td class="px-3 py-2 font-medium">${h.asset_type} / ${h.asset_id}</td>
+        <td class="px-3 py-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs
+            ${h.action==='upgrade' ? 'bg-blue-100 text-blue-700' : (h.action==='repair' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700')}">
+            ${h.action}
+          </span>
+        </td>
+        <td class="px-3 py-2">${h.summary ? h.summary.replace(/</g,'&lt;') : '-'}</td>
+        <td class="px-3 py-2">${h.note ? h.note.replace(/</g,'&lt;') : '-'}</td>
+      </tr>
+    `).join('');
+  }
+
   async function fetchMetrics() {
     const url = "{{ route('dashboard.metrics') }}" + `?min_age=${minAge}`;
     try {
@@ -227,6 +275,7 @@
       updatePie(metrics);
       updateUpgradeTable(metrics);
       updateLokasiRawan(metrics);
+      updateHistory(metrics); // <= render histori
     } catch (e) {
       console.error(e);
     }

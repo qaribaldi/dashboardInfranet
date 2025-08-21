@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetPrinter;
+use App\Models\AssetHistory; // <— tambahkan
 use Illuminate\Http\Request;
 
 class AssetPrinterController extends Controller
@@ -69,9 +70,50 @@ class AssetPrinterController extends Controller
         $request->validate([
             'id_printer' => 'required|string|unique:asset_printer,id_printer,'.$printer->id_printer.',id_printer',
             'tahun_pembelian' => 'nullable|integer',
+            'catatan_histori' => 'nullable|string', // opsional
         ]);
 
-        $printer->update($request->only($printer->getFillable()));
+        // Ambil input yang diizinkan & simpan nilai lama
+        $input  = $request->only($printer->getFillable());
+        $before = $printer->only(array_keys($input));
+
+        // Fill tanpa save → deteksi perbedaan
+        $printer->fill($input);
+        $dirty = $printer->getDirty(); // [field => newVal]
+
+        // Tentukan jenis aksi
+        $upgradeFields = ['merk','tipe','status_warna','scanner','tinta'];
+        $repairFields  = ['kondisi'];
+
+        $action = 'update';
+        $dirtyKeys = array_keys($dirty);
+        if (count(array_intersect($dirtyKeys, $upgradeFields)) > 0) {
+            $action = 'upgrade';
+        } elseif (count(array_intersect($dirtyKeys, $repairFields)) > 0) {
+            $action = 'repair';
+        }
+
+        // Ringkasan perubahan old -> new
+        $changes = [];
+        foreach ($dirty as $k => $newVal) {
+            $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
+        }
+
+        // Simpan perubahan
+        $printer->save();
+
+        // Catat histori jika ada perubahan
+        if (!empty($dirty)) {
+            AssetHistory::create([
+                'asset_type'   => 'printer',
+                'asset_id'     => $printer->id_printer,
+                'action'       => $action,
+                'changes_json' => $changes,
+                'note'         => $request->input('catatan_histori'),
+                'created_at'   => now('Asia/Jakarta'),
+            ]);
+        }
+
         return redirect()->route('printer.index')->with('success','Printer berhasil diperbarui.');
     }
 
@@ -82,8 +124,7 @@ class AssetPrinterController extends Controller
     }
 
     public function show(AssetPrinter $printer)
-{
-    return view('inventory.printer._detail', ['data' => $printer]);
-}
-
+    {
+        return view('inventory.printer._detail', ['data' => $printer]);
+    }
 }
