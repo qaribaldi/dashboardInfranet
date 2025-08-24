@@ -23,11 +23,11 @@
                    class="block px-3 py-2 rounded-lg hover:bg-gray-100 {{ str_starts_with(request()->path(),'inventory') ? 'bg-gray-50 font-semibold' : '' }}">
                     Inventory
                 </a>
-                <div class="mt-1 ml-3 space-y-1">
+                <!-- <div class="mt-1 ml-3 space-y-1">
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('pc.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('pc.index') }}">PC</a>
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('printer.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('printer.index') }}">Printer</a>
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('proyektor.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('proyektor.index') }}">Proyektor</a>
-                </div>
+                </div> -->
             </div>
         </nav>
     </aside>
