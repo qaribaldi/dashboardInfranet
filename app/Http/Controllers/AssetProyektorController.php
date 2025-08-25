@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 
 class AssetProyektorController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $columns = [
             'id_proyektor' => 'ID Proyektor',
@@ -22,8 +22,28 @@ class AssetProyektorController extends Controller
             'remote' => 'Remote',
             'tahun_pembelian' => 'Tahun',
         ];
-        $items = AssetProyektor::orderBy('id_proyektor')->paginate(12);
-        return view('inventory.proyektor.index', compact('items','columns'));
+
+        $q = trim($request->query('q', ''));
+
+        $items = AssetProyektor::query()
+            ->when($q !== '', function ($qb) use ($q) {
+                $like = '%'.$q.'%';
+                $qb->where(function ($w) use ($like) {
+                    $w->where('id_proyektor', 'like', $like)
+                        ->orWhere('nama_ruang', 'like', $like)
+                        ->orWhere('ruang', 'like', $like)
+                        ->orWhere('merk', 'like', $like)
+                        ->orWhere('tipe_proyektor', 'like', $like)
+                        ->orWhere('resolusi_max', 'like', $like)
+                        ->orWhere('remote', 'like', $like)
+                        ->orWhere('tahun_pembelian', 'like', $like);
+                });
+            })
+            ->orderBy('id_proyektor')
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('inventory.proyektor.index', compact('items','columns','q'));
     }
 
     public function create()

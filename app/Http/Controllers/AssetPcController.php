@@ -8,22 +8,86 @@ use Illuminate\Http\Request;
 
 class AssetPcController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $columns = [
-            'id_pc' => 'ID PC',
-            'unit_kerja' => 'Unit Kerja',
-            'user' => 'User',
-            'ruang' => 'Ruang',
-            'merk' => 'Merk',
-            'processor' => 'Processor',
-            'total_kapasitas_ram' => 'Total RAM',
-            'storage_1' => 'Storage 1',
-            'operating_sistem' => 'OS',
-            'tahun_pembelian' => 'Tahun',
-        ];
-        $items = AssetPc::orderBy('id_pc')->paginate(12);
-        return view('inventory.pc.index', compact('items','columns'));
+        'id_pc' => 'ID PC',
+        'unit_kerja' => 'Unit Kerja',
+        'user' => 'User',
+        'ruang' => 'Ruang',
+        'merk' => 'Merk',
+        'processor' => 'Processor',
+        'total_kapasitas_ram' => 'Total RAM',
+        'storage_1' => 'Storage 1',
+        'operating_sistem' => 'OS',
+        'tahun_pembelian' => 'Tahun',
+    ];
+
+    // query params
+    $q    = trim((string) $request->query('q', ''));
+    $proc = trim((string) $request->query('proc', ''));
+    $ram  = trim((string) $request->query('ram', ''));
+    $sto  = trim((string) $request->query('sto', ''));
+
+    // base query
+    $base = AssetPc::query();
+
+    // search (kalau sebelumnya sudah ada pola lain, boleh sesuaikan)
+    if ($q !== '') {
+        $base->where(function($w) use ($q) {
+            $like = "%{$q}%";
+            $w->where('id_pc','like',$like)
+              ->orWhere('unit_kerja','like',$like)
+              ->orWhere('user','like',$like)
+              ->orWhere('ruang','like',$like)
+              ->orWhere('merk','like',$like)
+              ->orWhere('processor','like',$like)
+              ->orWhere('total_kapasitas_ram','like',$like)
+              ->orWhere('storage_1','like',$like)
+              ->orWhere('storage_2','like',$like)
+              ->orWhere('storage_3','like',$like)
+              ->orWhere('operating_sistem','like',$like)
+              ->orWhere('tahun_pembelian','like',$like);
+        });
+    }
+
+    // filters
+    if ($proc !== '') {
+        $base->where('processor', $proc);
+    }
+    if ($ram !== '') {
+        $base->where('total_kapasitas_ram', $ram);
+    }
+    if ($sto !== '') {
+        // storage cocok di salah satu slot
+        $base->where(function($w) use ($sto) {
+            $w->where('storage_1', $sto)
+              ->orWhere('storage_2', $sto)
+              ->orWhere('storage_3', $sto);
+        });
+    }
+
+    $items = $base->orderBy('id_pc')->paginate(12)->appends($request->query());
+
+    // options untuk dropdown filter
+    $processors = AssetPc::whereNotNull('processor')
+        ->where('processor','<>','')
+        ->distinct()->orderBy('processor')->pluck('processor');
+
+    $rams = AssetPc::whereNotNull('total_kapasitas_ram')
+        ->where('total_kapasitas_ram','<>','')
+        ->distinct()->orderBy('total_kapasitas_ram')->pluck('total_kapasitas_ram');
+
+    // gabungkan storage_1/2/3 sebagai opsi
+    $storages = collect()
+        ->merge(AssetPc::whereNotNull('storage_1')->where('storage_1','<>','')->pluck('storage_1'))
+        ->merge(AssetPc::whereNotNull('storage_2')->where('storage_2','<>','')->pluck('storage_2'))
+        ->merge(AssetPc::whereNotNull('storage_3')->where('storage_3','<>','')->pluck('storage_3'))
+        ->filter()->unique()->sort()->values();
+
+    return view('inventory.pc.index', compact(
+        'items','columns','q','proc','ram','sto','processors','rams','storages'
+    ));
     }
 
     public function create()

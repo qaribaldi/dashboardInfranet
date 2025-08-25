@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\AssetPc;
 use App\Models\AssetPrinter;
 use App\Models\AssetProyektor;
-use App\Models\AssetHistory; // histori
+use App\Models\AssetAc;            // <-- TAMBAH: model AC
+use App\Models\AssetHistory;       // histori
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -52,11 +53,13 @@ class DashboardController extends Controller
         $totalPc        = AssetPc::count();
         $totalPrinter   = AssetPrinter::count();
         $totalProyektor = AssetProyektor::count();
+        $totalAc        = AssetAc::count();                              // <-- AC
 
         // ===== Hitung "old" SEBESAR BUCKET (BUKAN >= selected) =====
         $oldPc        = $applyYearRange(AssetPc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
         $oldPrinter   = $applyYearRange(AssetPrinter::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
         $oldProyektor = $applyYearRange(AssetProyektor::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
+        $oldAc        = $applyYearRange(AssetAc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count(); // <-- AC
 
         // ===== Bar chart: 8 tahun terakhir (global) =====
         $years = [];
@@ -68,6 +71,8 @@ class DashboardController extends Controller
             ->whereIn('tahun_pembelian', $years)->groupBy('tahun_pembelian')->pluck('c','y')->toArray();
         $proyektorByYear = AssetProyektor::selectRaw('tahun_pembelian as y, COUNT(*) as c')
             ->whereIn('tahun_pembelian', $years)->groupBy('tahun_pembelian')->pluck('c','y')->toArray();
+        $acByYear = AssetAc::selectRaw('tahun_pembelian as y, COUNT(*) as c') // <-- AC
+            ->whereIn('tahun_pembelian', $years)->groupBy('tahun_pembelian')->pluck('c','y')->toArray();
 
         $bar = [
             'labels' => $years,
@@ -75,13 +80,14 @@ class DashboardController extends Controller
                 'pc'        => array_map(fn($y) => $pcByYear[$y] ?? 0, $years),
                 'printer'   => array_map(fn($y) => $printerByYear[$y] ?? 0, $years),
                 'proyektor' => array_map(fn($y) => $proyektorByYear[$y] ?? 0, $years),
+                'ac'        => array_map(fn($y) => $acByYear[$y] ?? 0, $years), // <-- AC (view boleh pakai kapan-kapan)
             ],
         ];
 
-        // ===== Pie chart: proporsi aset per jenis (global) =====
+        // ===== Pie chart: proporsi aset per Jenis (global) =====
         $pie = [
-            'labels' => ['PC','Printer','Proyektor'],
-            'data'   => [$totalPc, $totalPrinter, $totalProyektor],
+            'labels' => ['PC','Printer','Proyektor','AC'],               // <-- AC
+            'data'   => [$totalPc, $totalPrinter, $totalProyektor, $totalAc],
         ];
 
         // ===== Kumpulan kandidat upgrade (berdasar BUCKET) =====
@@ -140,13 +146,35 @@ class DashboardController extends Controller
                             'tahun_pembelian' => $r->tahun_pembelian,
                             'umur'            => $currentYear - (int)$r->tahun_pembelian,
                         ]),
+            'ac' => $applyYearRange( // <-- LIST AC
+                        AssetAc::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                        'tahun_pembelian'
+                    )
+                    ->get(['id_ac as id','unit_kerja','ruang','merk','tipe_asset','ukuran_pk','kondisi','remote','tahun_pembelian'])
+                    ->map(fn($r)=>[
+                        'type'            => 'AC',
+                        'id'              => $r->id,
+                        'unit_kerja'      => $r->unit_kerja,
+                        'ruang'           => $r->ruang,
+                        // spesifikasi: merk / tipe / ukuran_pk
+                        'spes'            => trim($r->merk.' / '.$r->tipe_asset.' / '.$r->ukuran_pk),
+                        'processor'       => null,
+                        'ram'             => null,
+                        'status_warna'    => null,
+                        'resolusi_max'    => null,
+                        'kondisi'         => $r->kondisi,  
+                        'remote'          => $r->remote,    
+                        'tahun_pembelian' => $r->tahun_pembelian,
+                        'umur'            => $currentYear - (int)$r->tahun_pembelian,
+                    ]),
         ];
 
         // Gabungkan semua jenis
         $upgradeAll = array_values(array_merge(
             $upgradeList['pc']->toArray(),
             $upgradeList['printer']->toArray(),
-            $upgradeList['proyektor']->toArray()
+            $upgradeList['proyektor']->toArray(),
+            $upgradeList['ac']->toArray()            // <-- AC
         ));
 
         // ===== Siapkan OPSI DROPDOWN (distinct) =====
@@ -155,6 +183,9 @@ class DashboardController extends Controller
         $ramOptions      = [];
         $warnaOptions    = [];
         $resolusiOptions = [];
+        $kondisiOptions  = [];   
+        $remoteOptions   = [];  
+
 
         foreach ($upgradeAll as $u) {
             $lok = trim(($u['unit_kerja'] ?? '-')).' / '.trim(($u['ruang'] ?? '-'));
@@ -163,6 +194,9 @@ class DashboardController extends Controller
             if (!empty($u['ram']))           $ramOptions[$u['ram']] = true;
             if (!empty($u['status_warna']))  $warnaOptions[$u['status_warna']] = true;
             if (!empty($u['resolusi_max']))  $resolusiOptions[$u['resolusi_max']] = true;
+            if (!empty($u['kondisi'])) $kondisiOptions[$u['kondisi']] = true; // <- NEW
+            if (!empty($u['remote']))  $remoteOptions[$u['remote']]  = true; // <- NEW
+
         }
 
         $lokasiOptions   = array_values(array_keys($lokasiOptions));
@@ -176,6 +210,9 @@ class DashboardController extends Controller
         sort($ramOptions,      SORT_NATURAL);
         sort($warnaOptions,    SORT_NATURAL);
         sort($resolusiOptions, SORT_NATURAL);
+        sort($kondisiOptions, SORT_NATURAL);
+        sort($remoteOptions,  SORT_NATURAL);
+
 
         // ===== Server-side FILTER (opsional, tetap dipertahankan) =====
         $filterField = (string) $request->input('filter_field', '');   // lokasi | spes | ram | status_warna | resolusi_max
@@ -195,7 +232,12 @@ class DashboardController extends Controller
                     return ($r['status_warna'] ?? '') === $filterValue;
                 } elseif ($filterField === 'resolusi_max') {
                     return ($r['resolusi_max'] ?? '') === $filterValue;
+                } elseif ($filterField === 'kondisi') {
+                    return ($r['kondisi'] ?? '') === $filterValue;
+                } elseif ($filterField === 'remote') {
+                    return ($r['remote'] ?? '') === $filterValue;
                 }
+
                 return true;
             }));
         }
@@ -204,19 +246,20 @@ class DashboardController extends Controller
         usort($upgrade, fn($a,$b)=> $b['umur'] <=> $a['umur']);
 
         // ===== LOKASI PER-JENIS (top-5, sesuai bucket & filter) =====
-        $lokCounter = []; // "Unit / Ruang" => ['pc'=>0,'printer'=>0,'proyektor'=>0,'total'=>0]
+        // "Unit / Ruang" => ['pc'=>0,'printer'=>0,'proyektor'=>0,'ac'=>0,'total'=>0]
+        $lokCounter = [];
         foreach ($upgrade as $r) {
             $label = trim($r['unit_kerja'] ?? '-').' / '.trim($r['ruang'] ?? '-');
             if (!isset($lokCounter[$label])) {
-                $lokCounter[$label] = ['pc'=>0,'printer'=>0,'proyektor'=>0,'total'=>0];
+                $lokCounter[$label] = ['pc'=>0,'printer'=>0,'proyektor'=>0,'ac'=>0,'total'=>0];
             }
-            $type = strtolower($r['type']); // 'pc'|'printer'|'proyektor'
+            $type = strtolower($r['type']); // 'pc'|'printer'|'proyektor'|'ac'
             if (isset($lokCounter[$label][$type])) {
                 $lokCounter[$label][$type]++;
             }
             $lokCounter[$label]['total']++;
         }
-        // sort by total desc & slice top-5
+        // sort by total desc & ambil top-5
         uasort($lokCounter, fn($a,$b) => $b['total'] <=> $a['total']);
         $lokasiRawan = [];
         foreach (array_slice($lokCounter, 0, 5, true) as $label => $counts) {
@@ -225,6 +268,7 @@ class DashboardController extends Controller
                 'pc'         => $counts['pc'],
                 'printer'    => $counts['printer'],
                 'proyektor'  => $counts['proyektor'],
+                'ac'         => $counts['ac'],
                 'total'      => $counts['total'],
             ];
         }
@@ -278,17 +322,19 @@ class DashboardController extends Controller
                 'pc'        => $totalPc,
                 'printer'   => $totalPrinter,
                 'proyektor' => $totalProyektor,
+                'ac'        => $totalAc, // <-- AC
                 // jumlah dalam BUCKET
                 'old' => [
                     'pc'        => $oldPc,
                     'printer'   => $oldPrinter,
                     'proyektor' => $oldProyektor,
+                    'ac'        => $oldAc, // <-- AC
                 ],
             ],
             'bar'             => $bar,
             'pie'             => $pie,
             'upgrade'         => $upgrade,          // sudah dibatasi bucket dan filter server-side bila ada
-            'lokasi_rawan'    => $lokasiRawan,      // sekarang per-jenis + total
+            'lokasi_rawan'    => $lokasiRawan,      // sekarang per-jenis + total (termasuk AC)
             'lokasi_title'    => $lokasiTitle,      // judul dinamis
             'history'         => $history,
             'filters' => [
@@ -297,6 +343,9 @@ class DashboardController extends Controller
                 'ram_options'      => $ramOptions,
                 'warna_options'    => $warnaOptions,
                 'resolusi_options' => $resolusiOptions,
+                'kondisi_options'  => $kondisiOptions,
+                'remote_options'   => $remoteOptions
+
             ],
         ]);
     }

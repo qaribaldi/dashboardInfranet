@@ -11,10 +11,21 @@
           <option value="{{ route('pc.index') }}">PC</option>
           <option value="{{ route('printer.index') }}">Printer</option>
           <option value="{{ route('proyektor.index') }}" selected>Proyektor</option>
+          <option value="{{ route('ac.index') }}">AC</option>
         </select>
       </form>
-      <a href="{{ route('proyektor.create') }}"
-         class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Tambah</a>
+      {{-- Search bar --}}
+      <form method="GET" class="flex items-center gap-2">
+        <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Cari…"
+              class="w-64 rounded-lg border border-gray-300 px-3 py-2" />
+        @if(!empty($q))
+          <a href="{{ route('pc.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
+        @endif
+      </form>
+
+      {{-- Tombol tambah --}}
+      <a href="{{ route('pc.create') }}"
+        class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Tambah (+)</a>
     </div>
   </div>
 

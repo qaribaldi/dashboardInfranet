@@ -3,12 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetPrinter;
-use App\Models\AssetHistory; // <— tambahkan
+use App\Models\AssetHistory;
 use Illuminate\Http\Request;
 
 class AssetPrinterController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $columns = [
             'id_printer' => 'ID Printer',
@@ -23,8 +23,30 @@ class AssetPrinterController extends Controller
             'kondisi' => 'Kondisi',
             'tahun_pembelian' => 'Tahun',
         ];
-        $items = AssetPrinter::orderBy('id_printer')->paginate(12);
-        return view('inventory.printer.index', compact('items','columns'));
+
+        $q = trim($request->query('q', ''));
+
+        $items = AssetPrinter::query()
+            ->when($q !== '', function ($qb) use ($q) {
+                $like = '%'.$q.'%';
+                $qb->where(function ($w) use ($like) {
+                    $w->where('id_printer', 'like', $like)
+                        ->orWhere('unit_kerja', 'like', $like)
+                        ->orWhere('user', 'like', $like)
+                        ->orWhere('ruang', 'like', $like)
+                        ->orWhere('jenis_printer', 'like', $like)
+                        ->orWhere('merk', 'like', $like)
+                        ->orWhere('tipe', 'like', $like)
+                        ->orWhere('status_warna', 'like', $like)
+                        ->orWhere('kondisi', 'like', $like)
+                        ->orWhere('tahun_pembelian', 'like', $like);
+                });
+            })
+            ->orderBy('id_printer')
+            ->paginate(12)
+            ->withQueryString();
+
+        return view('inventory.printer.index', compact('items','columns','q'));
     }
 
     public function create()

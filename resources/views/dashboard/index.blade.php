@@ -18,23 +18,29 @@
   </div>
 
   {{-- KPI Cards --}}
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    <div class="rounded-xl border bg-white p-4">
-      <div class="text-sm text-gray-500">Total PC</div>
-      <div id="kpiPc" class="text-2xl font-semibold">-</div>
-      <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
-    </div>
-    <div class="rounded-xl border bg-white p-4">
-      <div class="text-sm text-gray-500">Total Printer</div>
-      <div id="kpiPrinter" class="text-2xl font-semibold">-</div>
-      <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiPrinterOld">-</span></div>
-    </div>
-    <div class="rounded-xl border bg-white p-4">
-      <div class="text-sm text-gray-500">Total Proyektor</div>
-      <div id="kpiProyektor" class="text-2xl font-semibold">-</div>
-      <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiProyektorOld">-</span></div>
-    </div>
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-sm text-gray-500">Total PC</div>
+    <div id="kpiPc" class="text-2xl font-semibold">-</div>
+    <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
   </div>
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-sm text-gray-500">Total Printer</div>
+    <div id="kpiPrinter" class="text-2xl font-semibold">-</div>
+    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiPrinterOld">-</span></div>
+  </div>
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-sm text-gray-500">Total Proyektor</div>
+    <div id="kpiProyektor" class="text-2xl font-semibold">-</div>
+    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiProyektorOld">-</span></div>
+  </div>
+  <div class="rounded-xl border bg-white p-4">
+    <div class="text-sm text-gray-500">Total AC</div>
+    <div id="kpiAc" class="text-2xl font-semibold">-</div>
+    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiAcOld">-</span></div>
+  </div>
+</div>
+
 
   <div class="mb-6 text-sm text-gray-500">
     <span id="lastUpdated">Terakhir diperbarui: -</span>
@@ -73,6 +79,7 @@
             <option value="PC">PC</option>
             <option value="Printer">Printer</option>
             <option value="Proyektor">Proyektor</option>
+            <option value="AC">AC</option>
           </select>
         </div>
         <div>
@@ -131,12 +138,13 @@
               <th class="text-left px-3 py-2">PC</th>
               <th class="text-left px-3 py-2">Printer</th>
               <th class="text-left px-3 py-2">Proyektor</th>
+              <th class="text-left px-3 py-2">AC</th>
               <th class="text-left px-3 py-2">Total</th>
             </tr>
           </thead>
-          <tbody id="lokasiRawanBody">
-            <tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
-          </tbody>
+         <tbody id="lokasiRawanBody">
+            <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
+         </tbody>
         </table>
       </div>
     </div>
@@ -199,13 +207,15 @@
   const colors = {
     pc: 'rgba(37, 99, 235, 0.7)',
     printer: 'rgba(16, 185, 129, 0.7)',
-    proyektor: 'rgba(234, 179, 8, 0.7)'
+    proyektor: 'rgba(234, 179, 8, 0.7)',
+    ac: 'rgba(244, 63, 94, 0.7)'
   };
 
   const SHOW_URLS = {
     PC: "{{ url('/inventory/pc') }}",
     Printer: "{{ url('/inventory/printer') }}",
-    Proyektor: "{{ url('/inventory/proyektor') }}"
+    Proyektor: "{{ url('/inventory/proyektor') }}",
+    AC: "{{ url('/inventory/ac') }}",
   };
 
   function initCharts() {
@@ -224,7 +234,7 @@
 
     pieChart = new Chart(pieCtx, {
       type: 'pie',
-      data: { labels: [], datasets: [{ data: [], backgroundColor: [colors.pc, colors.printer, colors.proyektor], borderWidth: 1 }] },
+      data: { labels: [], datasets: [{ data: [], backgroundColor: [colors.pc, colors.printer, colors.proyektor, colors.ac], borderWidth: 1 }] },
       options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
     });
   }
@@ -233,10 +243,12 @@
     document.getElementById('kpiPc').textContent = m.totals.pc;
     document.getElementById('kpiPrinter').textContent = m.totals.printer;
     document.getElementById('kpiProyektor').textContent = m.totals.proyektor;
+    document.getElementById('kpiAc').textContent = m.totals.ac;
 
     document.getElementById('kpiPcOld').textContent = m.totals.old.pc;
     document.getElementById('kpiPrinterOld').textContent = m.totals.old.printer;
     document.getElementById('kpiProyektorOld').textContent = m.totals.old.proyektor;
+    document.getElementById('kpiAcOld').textContent = m.totals.old.ac;
 
     document.getElementById('lastUpdated').textContent = 'Terakhir diperbarui: ' + fmt.format(new Date(m.now));
 
@@ -252,6 +264,8 @@
       { label: 'PC', data: m.bar.datasets.pc, backgroundColor: colors.pc },
       { label: 'Printer', data: m.bar.datasets.printer, backgroundColor: colors.printer },
       { label: 'Proyektor', data: m.bar.datasets.proyektor, backgroundColor: colors.proyektor },
+      { label: 'AC',        data: m.bar.datasets.ac,        backgroundColor: colors.ac },
+      
     ];
     barChart.update();
   }
@@ -281,12 +295,17 @@
     Printer: [
       { key: 'lokasi',       label: 'Unit / Ruang' },
       { key: 'spes',         label: 'Spesifikasi' },
-      { key: 'status_warna', label: 'Warna' },
+      { key: 'status_warna', label: 'Status Warna' },
     ],
     Proyektor: [
       { key: 'lokasi',       label: 'Unit / Ruang' },
       { key: 'spes',         label: 'Spesifikasi' },
       { key: 'resolusi_max', label: 'Resolusi' },
+    ],
+    AC: [
+      { key: 'lokasi', label: 'Unit / Ruang' },
+      { key: 'spes',   label: 'Merk' },
+      { key: 'remote',  label: 'Remote' },  
     ],
     ALL: [
       { key: 'lokasi', label: 'Unit / Ruang' },
@@ -337,7 +356,11 @@
     } else if (filterField === 'resolusi_max') {
       const vals = unique(base.filter(u => u.type === 'Proyektor').map(u => u.resolusi_max ?? '').filter(Boolean));
       options = [''].concat(vals);
+    } else if (filterField === 'remote') {
+      const vals = unique(base.filter(u => u.type === 'AC').map(u => u.remote ?? '').filter(Boolean));
+      options = [''].concat(vals);
     }
+
 
     sel.innerHTML = options.map(v => `<option value="${v}">${v || 'Semua'}</option>`).join('');
     if (preservedValue && options.includes(preservedValue)) {
@@ -370,7 +393,10 @@
         list = list.filter(u => (u.status_warna ?? '') === filterValue);
       } else if (filterField === 'resolusi_max') {
         list = list.filter(u => (u.resolusi_max ?? '') === filterValue);
+      } else if (filterField === 'remote') {
+        list = list.filter(u => (u.remote ?? '') === filterValue);
       }
+
     }
 
     upgradeFiltered = list;
@@ -440,6 +466,7 @@
         <td class="px-3 py-2">${r.pc ?? 0}</td>
         <td class="px-3 py-2">${r.printer ?? 0}</td>
         <td class="px-3 py-2">${r.proyektor ?? 0}</td>
+        <td class="px-3 py-2">${r.ac ?? 0}</td>
         <td class="px-3 py-2 font-medium">${r.total ?? 0}</td>
       </tr>
     `).join('');

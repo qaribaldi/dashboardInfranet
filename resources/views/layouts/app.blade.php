@@ -27,6 +27,7 @@
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('pc.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('pc.index') }}">PC</a>
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('printer.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('printer.index') }}">Printer</a>
                     <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('proyektor.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('proyektor.index') }}">Proyektor</a>
+                    <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('ac.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('ac.index') }}">PC</a>
                 </div> -->
             </div>
         </nav>
