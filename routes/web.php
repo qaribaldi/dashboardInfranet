@@ -1,28 +1,55 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\AssetPcController;
 use App\Http\Controllers\AssetPrinterController;
 use App\Http\Controllers\AssetProyektorController;
 use App\Http\Controllers\AssetAcController;
 
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+// Landing (publik) — kalau sudah login langsung ke dashboard (opsional)
+Route::view('/', 'landing')->name('landing');
 
-// Alias: /dashboard -> dashboard yang sama
-Route::get('/dashboard', fn () => redirect()->route('dashboard'));
+// Dashboard (butuh login)
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware('auth')
+    ->name('dashboard');
 
-// Redirect /inventory -> /inventory/pc
-Route::redirect('/inventory', '/inventory/pc')->name('inventory.index');
+// Metrics JSON (butuh login)
+Route::get('/dashboard/metrics', [DashboardController::class, 'metrics'])
+    ->middleware('auth')
+    ->name('dashboard.metrics');
 
-// Resource per jenis aset
-Route::prefix('inventory')->group(function () {
-    Route::resource('pc', AssetPcController::class);
-    Route::resource('printer', AssetPrinterController::class);
-    Route::resource('proyektor', AssetProyektorController::class);
-    Route::resource('ac', AssetAcController::class);
+/**
+ * INVENTORY DEFAULT → redirect ke PC
+ */
+Route::get('/inventory', fn () => redirect()->route('inventory.pc.index'))
+    ->middleware('auth')
+    ->name('inventory');
+
+/**
+ * INVENTORY: ADMIN CRUD — DAFTARKAN DULU
+ * (agar /inventory/{resource}/create tidak ketabrak oleh /inventory/{resource}/{id})
+ */
+Route::prefix('inventory')->middleware(['auth','admin'])->name('inventory.')->group(function () {
+    Route::resource('pc',        AssetPcController::class)->except(['index','show']);
+    Route::resource('printer',   AssetPrinterController::class)->except(['index','show']);
+    Route::resource('proyektor', AssetProyektorController::class)->except(['index','show']);
+    Route::resource('ac',        AssetAcController::class)->except(['index','show']);
 });
 
-// JSON metrics untuk DSS
-Route::get('/dashboard/metrics', [DashboardController::class, 'metrics'])->name('dashboard.metrics');
+/**
+ * INVENTORY: USER (index, show)
+ */
+Route::prefix('inventory')->middleware('auth')->name('inventory.')->group(function () {
+    Route::resource('pc',        AssetPcController::class)->only(['index','show']);
+    Route::resource('printer',   AssetPrinterController::class)->only(['index','show']);
+    Route::resource('proyektor', AssetProyektorController::class)->only(['index','show']);
+    Route::resource('ac',        AssetAcController::class)->only(['index','show']);
+});
+
+Route::delete('/dashboard/clear-history', [DashboardController::class, 'clearHistory'])
+    ->name('dashboard.clear-history');
+
+// routes auth bawaan Breeze
+require __DIR__.'/auth.php';

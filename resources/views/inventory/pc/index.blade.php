@@ -11,10 +11,10 @@
     <label class="text-sm font-medium">Jenis Aset</label>
     <select class="border border-gray-300 rounded-lg px-3 py-2 w-32 text-sm"
             onchange="window.location.href=this.value">
-      <option value="{{ route('pc.index') }}" selected>PC</option>
-      <option value="{{ route('printer.index') }}">Printer</option>
-      <option value="{{ route('proyektor.index') }}">Proyektor</option>
-      <option value="{{ route('ac.index') }}">AC</option>
+      <option value="{{ route('inventory.pc.index') }}" selected>PC</option>
+      <option value="{{ route('inventory.printer.index') }}">Printer</option>
+      <option value="{{ route('inventory.proyektor.index') }}">Proyektor</option>
+      <option value="{{ route('inventory.ac.index') }}">AC</option>
     </select>
 
     {{-- Search bar --}}
@@ -22,7 +22,7 @@
         <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Cari…"
               class="w-64 rounded-lg border border-gray-300 px-3 py-2" />
         @if(!empty($q))
-          <a href="{{ route('pc.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
+          <a href="{{ route('inventory.pc.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
         @endif
       </form>
 
@@ -32,46 +32,48 @@
       Filter
     </button>
 
-    <a href="{{ route('pc.create') }}"
+    @if(auth()->user()->role === 'admin')
+    <a href="{{ route('inventory.pc.create') }}"
        class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Tambah</a>
+    @endif
   </div>
 </div>
 
 {{-- FILTER CHIPS (muncul hanya jika ada filter aktif) --}}
 @php
-  $hasFilter = ($proc ?? '')!=='' || ($ram ?? '')!=='' || ($sto ?? '')!=='';
+  $hasFilter = ($proc ?? '')!=='' || ($ram ?? '')!=='' || ($sto ?? '')!==''; 
 @endphp
 @if($hasFilter)
   <div class="mb-3 flex flex-wrap items-center gap-2">
     <span class="text-sm text-gray-500 mr-1">Aktif:</span>
 
     @if(($proc ?? '')!=='')
-      <a href="{{ route('pc.index', array_filter(['q'=>$q??'', 'ram'=>$ram??'', 'sto'=>$sto??''])) }}"
+      <a href="{{ route('inventory.pc.index', array_filter(['q'=>$q??'', 'ram'=>$ram??'', 'sto'=>$sto??''])) }}"
          class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm">
         Processor: {{ $proc }} <span class="text-gray-400">✕</span>
       </a>
     @endif
     @if(($ram ?? '')!=='')
-      <a href="{{ route('pc.index', array_filter(['q'=>$q??'', 'proc'=>$proc??'', 'sto'=>$sto??''])) }}"
+      <a href="{{ route('inventory.pc.index', array_filter(['q'=>$q??'', 'proc'=>$proc??'', 'sto'=>$sto??''])) }}"
          class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm">
         RAM: {{ $ram }} <span class="text-gray-400">✕</span>
       </a>
     @endif
     @if(($sto ?? '')!=='')
-      <a href="{{ route('pc.index', array_filter(['q'=>$q??'', 'proc'=>$proc??'', 'ram'=>$ram??''])) }}"
+      <a href="{{ route('inventory.pc.index', array_filter(['q'=>$q??'', 'proc'=>$proc??'', 'ram'=>$ram??''])) }}"
          class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-sm">
         Storage: {{ $sto }} <span class="text-gray-400">✕</span>
       </a>
     @endif
 
-    <a href="{{ route('pc.index', array_filter(['q'=>$q??''])) }}"
+    <a href="{{ route('inventory.pc.index', array_filter(['q'=>$q??''])) }}"
        class="ml-2 text-sm text-blue-600 hover:underline">Reset semua</a>
   </div>
 @endif
 
 {{-- FILTER PANEL (collapsible) --}}
 <div id="filterPanel" class="hidden mb-4 rounded-xl border bg-white p-3">
-  <form method="GET" action="{{ route('pc.index') }}">
+  <form method="GET" action="{{ route('inventory.pc.index') }}">
     {{-- pertahankan keyword search ketika apply filter --}}
     <input type="hidden" name="q" value="{{ $q ?? '' }}">
 
@@ -108,7 +110,7 @@
 
       <div class="flex gap-2">
         <button class="rounded-lg bg-blue-600 text-white px-3 py-2 text-sm hover:bg-blue-700">Terapkan</button>
-        <a href="{{ route('pc.index', array_filter(['q'=>$q??''])) }}"
+        <a href="{{ route('inventory.pc.index', array_filter(['q'=>$q??''])) }}"
            class="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50">Reset</a>
       </div>
     </div>
@@ -181,11 +183,11 @@
             <td class="px-4 py-2">{{ $row->user }}</td>
             <td class="px-4 py-2">{{ $row->ruang }}</td>
             <td class="px-4 py-2">{{ $row->merk }}</td>
-           
+
             <!-- Processor pecah -->
   <td class="px-4 py-2">{{ $cpuBrand }}</td>
   <td class="px-4 py-2">{{ $cpuType }}</td>
-           
+
             <!-- RAM pecah -->
   <td class="px-4 py-2">{{ $ramBrand }}</td>
   <td class="px-4 py-2">{{ $ramType }}</td>
@@ -195,16 +197,17 @@
             <td class="px-4 py-2 whitespace-nowrap">{{ $row->tahun_pembelian }}</td>
             <td class="px-4 py-2 text-right whitespace-nowrap">
   <a href="javascript:void(0)"
-   onclick="openModal('{{ route('pc.show',$row->id_pc) }}','Detail PC - {{ $row->id_pc }}')"
+   onclick="openModal('{{ route('inventory.pc.show',$row->id_pc) }}','Detail PC - {{ $row->id_pc }}')"
    class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Detail</a>
-
-              <a href="{{ route('pc.edit',$row->id_pc) }}"
+              @if(auth()->user()->role === 'admin')
+              <a href="{{ route('inventory.pc.edit',$row->id_pc) }}"
                  class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
-              <form action="{{ route('pc.destroy',$row->id_pc) }}" method="POST" class="inline"
+              <form action="{{ route('inventory.pc.destroy',$row->id_pc) }}" method="POST" class="inline"
                     onsubmit="return confirm('Hapus data ini?')">
                 @csrf @method('DELETE')
                 <button class="inline-flex items-center rounded border border-red-300 text-red-700 px-3 py-1.5 hover:bg-red-50">Hapus</button>
               </form>
+              @endif
             </td>
           </tr>
         @empty

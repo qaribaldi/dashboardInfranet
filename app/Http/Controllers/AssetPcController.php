@@ -32,7 +32,6 @@ class AssetPcController extends Controller
     // base query
     $base = AssetPc::query();
 
-    // search (kalau sebelumnya sudah ada pola lain, boleh sesuaikan)
     if ($q !== '') {
         $base->where(function($w) use ($q) {
             $like = "%{$q}%";
@@ -141,7 +140,7 @@ class AssetPcController extends Controller
         ]);
 
         AssetPc::create($request->only((new AssetPc)->getFillable()));
-        return redirect()->route('pc.index')->with('success','Aset PC berhasil ditambahkan.');
+        return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil ditambahkan.');
     }
 
     public function edit(AssetPc $pc)
@@ -200,13 +199,13 @@ class AssetPcController extends Controller
             ]);
         }
 
-        return redirect()->route('pc.index')->with('success','Aset PC berhasil diperbarui.');
+        return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil diperbarui.');
     }
 
     public function destroy(AssetPc $pc)
     {
         $pc->delete();
-        return redirect()->route('pc.index')->with('success','Aset PC berhasil dihapus.');
+        return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil dihapus.');
     }
 
     // show untuk modal detail (partial)

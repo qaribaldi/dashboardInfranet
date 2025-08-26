@@ -3,7 +3,7 @@
 @section('content')
   <h2 class="text-2xl font-bold mb-6">{{ $mode === 'create' ? 'Tambah' : 'Edit' }} Proyektor</h2>
 
-  <form action="{{ $mode === 'create' ? route('proyektor.store') : route('proyektor.update',$data->id_proyektor) }}" method="POST" class="space-y-5">
+  <form action="{{ $mode === 'create' ? route('inventory.proyektor.store') : route('inventory.proyektor.update',$data->id_proyektor) }}" method="POST" class="space-y-5">
     @csrf
     @if($mode === 'edit') @method('PUT') @endif
 
@@ -27,7 +27,7 @@
       <button class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
         {{ $mode === 'create' ? 'Simpan' : 'Update' }}
       </button>
-      <a href="{{ route('proyektor.index') }}" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Batal</a>
+      <a href="{{ route('inventory.proyektor.index') }}" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Batal</a>
     </div>
   </form>
 @endsection

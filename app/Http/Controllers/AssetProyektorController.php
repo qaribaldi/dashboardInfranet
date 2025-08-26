@@ -73,7 +73,7 @@ class AssetProyektorController extends Controller
         ]);
 
         AssetProyektor::create($request->only((new AssetProyektor)->getFillable()));
-        return redirect()->route('proyektor.index')->with('success','Proyektor berhasil ditambahkan.');
+        return redirect()->route('inventory.proyektor.index')->with('success','Proyektor berhasil ditambahkan.');
     }
 
     public function edit(AssetProyektor $proyektor)
@@ -131,13 +131,13 @@ class AssetProyektorController extends Controller
             ]);
         }
 
-        return redirect()->route('proyektor.index')->with('success','Proyektor berhasil diperbarui.');
+        return redirect()->route('inventory.proyektor.index')->with('success','Proyektor berhasil diperbarui.');
     }
 
     public function destroy(AssetProyektor $proyektor)
     {
         $proyektor->delete();
-        return redirect()->route('proyektor.index')->with('success','Proyektor berhasil dihapus.');
+        return redirect()->route('inventory.proyektor.index')->with('success','Proyektor berhasil dihapus.');
     }
 
     public function show(AssetProyektor $proyektor)

@@ -8,10 +8,10 @@
         <label class="text-sm font-medium">Jenis Aset</label>
         <select class="border border-gray-300 rounded-lg px-3 py-2"
                 onchange="window.location.href=this.value">
-          <option value="{{ route('pc.index') }}">PC</option>
-          <option value="{{ route('printer.index') }}" selected>Printer</option>
-          <option value="{{ route('proyektor.index') }}">Proyektor</option>
-          <option value="{{ route('ac.index') }}">AC</option>
+          <option value="{{ route('inventory.pc.index') }}">PC</option>
+          <option value="{{ route('inventory.printer.index') }}" selected>Printer</option>
+          <option value="{{ route('inventory.proyektor.index') }}">Proyektor</option>
+          <option value="{{ route('inventory.ac.index') }}">AC</option>
         </select>
       </form>
       {{-- Search bar --}}
@@ -19,13 +19,15 @@
         <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Cari…"
               class="w-64 rounded-lg border border-gray-300 px-3 py-2" />
         @if(!empty($q))
-          <a href="{{ route('pc.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
+          <a href="{{ route('inventory.printer.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
         @endif
       </form>
 
       {{-- Tombol tambah --}}
-      <a href="{{ route('pc.create') }}"
+      @if(auth()->user()->role === 'admin')
+      <a href="{{ route('inventory.printer.create') }}"
         class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Tambah (+)</a>
+      @endif
     </div>
   </div>
 
@@ -61,14 +63,15 @@
             <td class="px-4 py-2 whitespace-nowrap">{{ $row->tahun_pembelian }}</td>
             <td class="px-4 py-2 text-right whitespace-nowrap">
               <a href="javascript:void(0)"
-   onclick="openModal('{{ route('printer.show',$row->id_printer) }}','Detail Printer - {{ $row->id_printer }}')"
+   onclick="openModal('{{ route('inventory.printer.show',$row->id_printer) }}','Detail Printer - {{ $row->id_printer }}')"
    class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Detail</a>
-
-              <a href="{{ route('printer.edit',$row->id_printer) }}" class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
-              <form action="{{ route('printer.destroy',$row->id_printer) }}" method="POST" class="inline" onsubmit="return confirm('Hapus data ini?')">
+              @if(auth()->user()->role === 'admin')
+              <a href="{{ route('inventory.printer.edit',$row->id_printer) }}" class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
+              <form action="{{ route('inventory.printer.destroy',$row->id_printer) }}" method="POST" class="inline" onsubmit="return confirm('Hapus data ini?')">
                 @csrf @method('DELETE')
                 <button class="inline-flex items-center rounded border border-red-300 text-red-700 px-3 py-1.5 hover:bg-red-50">Hapus</button>
               </form>
+              @endif
             </td>
           </tr>
         @empty

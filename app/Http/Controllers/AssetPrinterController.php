@@ -78,7 +78,7 @@ class AssetPrinterController extends Controller
         ]);
 
         AssetPrinter::create($request->only((new AssetPrinter)->getFillable()));
-        return redirect()->route('printer.index')->with('success','Printer berhasil ditambahkan.');
+        return redirect()->route('inventory.printer.index')->with('success','Printer berhasil ditambahkan.');
     }
 
     public function edit(AssetPrinter $printer)
@@ -136,13 +136,13 @@ class AssetPrinterController extends Controller
             ]);
         }
 
-        return redirect()->route('printer.index')->with('success','Printer berhasil diperbarui.');
+        return redirect()->route('inventory.printer.index')->with('success','Printer berhasil diperbarui.');
     }
 
     public function destroy(AssetPrinter $printer)
     {
         $printer->delete();
-        return redirect()->route('printer.index')->with('success','Printer berhasil dihapus.');
+        return redirect()->route('inventory.printer.index')->with('success','Printer berhasil dihapus.');
     }
 
     public function show(AssetPrinter $printer)

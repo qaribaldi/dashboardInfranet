@@ -1,71 +1,64 @@
-@extends('layouts.guest')
+@extends('layouts.public')
 
-@section('title','Aset IT • Infranet UNIKOM')
+@section('title','Selamat Datang • Infranet')
 
 @section('content')
-  <section class="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-indigo-50 via-white to-emerald-50">
-    <div class="pointer-events-none absolute -top-16 -left-24 h-72 w-72 rounded-full bg-indigo-300/30 blur-3xl"></div>
-    <div class="pointer-events-none absolute -bottom-10 -right-10 h-72 w-72 rounded-full bg-emerald-300/30 blur-3xl"></div>
+<section class="relative h-screen overflow-hidden flex flex-col items-center justify-center text-center 
+  bg-[radial-gradient(1200px_600px_at_-10%_-20%,#c7d2fe_0%,transparent_60%),radial-gradient(1200px_600px_at_110%_120%,#bbf7d0_0%,transparent_60%)] 
+  from-indigo-50 via-white to-emerald-50">
 
-    <div class="relative mx-auto max-w-5xl px-6 py-14 md:py-18 text-center">
-      <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
-        Selamat Datang di <span class="bg-gradient-to-r from-indigo-600 to-emerald-600 bg-clip-text text-transparent">Asset IT Infranet</span>
-      </h1>
-      <p class="mt-3 text-slate-600 max-w-2xl mx-auto">
-        Portal internal untuk monitoring, pendataan, analisis, dan pencatatan asset it. <br>
-        Khusus untuk Divisi Infranet UNIKOM
-      </p>
+  {{-- Dekorasi gradien besar sisi kiri/kanan (tambahan sebar) --}}
+  <div class="pointer-events-none absolute -top-40 -left-40 h-[38rem] w-[38rem] rounded-full 
+              bg-gradient-to-br from-indigo-300/50 via-fuchsia-300/40 to-emerald-300/40 blur-3xl"></div>
+  <div class="pointer-events-none absolute -bottom-48 -right-48 h-[42rem] w-[42rem] rounded-full 
+              bg-gradient-to-tr from-emerald-300/50 via-sky-300/40 to-indigo-300/40 blur-3xl"></div>
 
-      <div class="mt-6 flex items-center justify-center gap-3">
-        @auth
-          <a href="{{ route('dashboard') }}" class="rounded-xl bg-indigo-600 px-5 py-3 text-white shadow hover:bg-indigo-700">
-            Buka Dashboard
-          </a>
-        @else
-          <a href="{{ route('login') }}" class="rounded-xl bg-slate-900 px-5 py-3 text-white hover:bg-black">
-            Masuk
-          </a>
-          
-        @endauth
+  {{-- konten --}}
+  <div class="relative max-w-3xl px-6">
+
+    {{-- lingkaran gradien lembut di belakang teks --}}
+    <div class="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+      <div class="h-56 w-56 md:h-72 md:w-72 rounded-full blur-3xl opacity-70
+                  bg-[conic-gradient(at_50%_50%,#a5b4fc_0deg,#86efac_120deg,#93c5fd_240deg,#a5b4fc_360deg)]">
       </div>
     </div>
-  </section>
 
-  {{-- GRID Info singkat --}}
-  <section class="mx-auto max-w-5xl px-6 mt-10">
-    <div class="grid md:grid-cols-3 gap-4">
-      {{-- Kotak pengumuman --}}
-      <div class="md:col-span-2 rounded-2xl border bg-white p-5 hover:shadow-sm transition">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-semibold">Informasi</h2>
-        </div>
-        <div class="mt-3 text-slate-600 leading-relaxed">
-          {{-- Tulis info penting singkat di sini --}}
-          <p class="mb-2">• Jadwal audit aset semester ini dimulai pekan depan.</p>
-          <p class="mb-2">• Mohon update data perangkat yang belum lengkap (tahun pembelian / lokasi).</p>
-          <p>• Hubungi admin jika menemui kendala akses.</p>
+    <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900">
+      Selamat Datang di 
+      <span class="bg-gradient-to-r from-indigo-600 via-sky-600 to-emerald-600 bg-clip-text text-transparent">
+        Infranet
+      </span>
+    </h1>
+
+    <p class="mt-4 text-slate-700/90 max-w-xl mx-auto">
+      Portal internal Divisi TIK Kampus untuk monitoring aset & analitik sederhana.
+    </p>
+
+    {{-- tombol + lingkaran gradien di belakang tombol --}}
+    <div class="mt-8 relative inline-block">
+      <div class="pointer-events-none absolute inset-0 -z-10 flex items-center justify-center">
+        <div class="h-24 w-24 md:h-28 md:w-28 rounded-full blur-2xl opacity-80
+                    bg-[radial-gradient(circle_at_center,#a7f3d0_0%,#c7d2fe_45%,transparent_60%)]">
         </div>
       </div>
 
-      {{-- Kotak kontak ringkas --}}
-      <div class="rounded-2xl border bg-white p-5 hover:shadow-sm transition">
-        <h3 class="text-lg font-semibold">Kontak Admin</h3>
-        <div class="mt-3 text-sm text-slate-600 space-y-2">
-          <p>Email: <span class="font-medium">admin@unikom.ac.id</span></p>
-          <p>Nomor: <span class="font-medium">0891234</span></p>
-          <p>Jam Layanan: <span class="font-medium">07.00–17.00 WIB</span></p>
-        </div>
-        <div class="mt-4">
-          @auth
-            <a href="{{ route('dashboard') }}" class="inline-block rounded-lg border px-4 py-2 hover:bg-gray-50">Ke Dashboard</a>
-          @endauth
-        </div>
-      </div>
+      @guest
+        <a href="{{ route('login') }}"
+           class="inline-flex items-center rounded-xl bg-slate-900 px-6 py-3 text-white hover:bg-black transition">
+          Login / Register
+        </a>
+      @else
+        <a href="{{ route('dashboard') }}"
+           class="inline-flex items-center rounded-xl bg-indigo-600 px-6 py-3 text-white hover:bg-indigo-700 transition">
+          Buka Dashboard
+        </a>
+      @endguest
     </div>
-  </section>
+  </div>
 
-  {{-- Footer mini --}}
-  <footer class="mx-auto max-w-5xl px-6 mt-10 mb-6 text-center text-sm text-slate-500">
-    © {{ date('Y') }} Asset IT Infranet • UNIKOM
+  {{-- footer nempel bawah, tetap center --}}
+  <footer class="absolute bottom-6 left-0 right-0 text-center text-sm text-slate-600/80">
+    © {{ date('Y') }} Divisi TIK Kampus • Infranet
   </footer>
+</section>
 @endsection

@@ -16,4 +16,9 @@ class AssetAc extends Model
         'id_ac','unit_kerja','ruang','tipe_asset','merk','ukuran_pk',
         'kondisi','remote','tahun_pembelian','keterangan'
     ];
+
+    public function getRouteKeyName()
+    {
+        return 'id_ac';
+    }
 }

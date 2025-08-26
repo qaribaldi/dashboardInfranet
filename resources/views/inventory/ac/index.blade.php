@@ -4,27 +4,31 @@
   <div class="flex items-center justify-between mb-6">
     <h2 class="text-2xl font-bold">Inventory - AC</h2>
     <div class="flex items-center gap-3">
+      {{-- Dropdown jenis aset --}}
       <form class="flex items-center gap-2">
         <label class="text-sm font-medium">Jenis Aset</label>
         <select class="border border-gray-300 rounded-lg px-3 py-2" onchange="window.location.href=this.value">
-          <option value="{{ route('pc.index') }}">PC</option>
-          <option value="{{ route('printer.index') }}">Printer</option>
-          <option value="{{ route('proyektor.index') }}">Proyektor</option>
-          <option value="{{ route('ac.index') }}" selected>AC</option>
+          <option value="{{ route('inventory.pc.index') }}">PC</option>
+          <option value="{{ route('inventory.printer.index') }}">Printer</option>
+          <option value="{{ route('inventory.proyektor.index') }}">Proyektor</option>
+          <option value="{{ route('inventory.ac.index') }}" selected>AC</option>
         </select>
       </form>
+
       {{-- Search bar --}}
-      <form method="GET" class="flex items-center gap-2">
+      <form method="GET" action="{{ route('inventory.ac.index') }}" class="flex items-center gap-2">
         <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Cari…"
               class="w-64 rounded-lg border border-gray-300 px-3 py-2" />
         @if(!empty($q))
-          <a href="{{ route('pc.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
+          <a href="{{ route('inventory.ac.index') }}" class="text-sm text-gray-600 hover:underline">Reset</a>
         @endif
       </form>
 
       {{-- Tombol tambah --}}
-      <a href="{{ route('pc.create') }}"
+      @if(auth()->user()->role === 'admin')
+      <a href="{{ route('inventory.ac.create') }}"
         class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Tambah (+)</a>
+      @endif
     </div>
   </div>
 
@@ -57,17 +61,19 @@
             <td class="px-4 py-2 text-right whitespace-nowrap">
 
               <a href="javascript:void(0)"
-                 onclick="openModal('{{ route('ac.show', $row->id_ac) }}','Detail AC - {{ $row->id_ac }}')"
+                 onclick="openModal('{{ route('inventory.ac.show', $row->id_ac) }}','Detail AC - {{ $row->id_ac }}')"
                  class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Detail</a>
 
-              <a href="{{ route('ac.edit',$row->id_ac) }}"
+              @if(auth()->user()->role === 'admin')
+              <a href="{{ route('inventory.ac.edit',$row->id_ac) }}"
                  class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
 
-              <form action="{{ route('ac.destroy',$row->id_ac) }}" method="POST" class="inline"
+              <form action="{{ route('inventory.ac.destroy',$row->id_ac) }}" method="POST" class="inline"
                     onsubmit="return confirm('Hapus data ini?')">
                 @csrf @method('DELETE')
                 <button class="inline-flex items-center rounded border border-red-300 text-red-700 px-3 py-1.5 hover:bg-red-50">Hapus</button>
               </form>
+              @endif
             </td>
           </tr>
         @empty

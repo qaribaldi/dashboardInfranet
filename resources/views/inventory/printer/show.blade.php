@@ -4,8 +4,8 @@
   <div class="flex items-center justify-between mb-6">
     <h2 class="text-2xl font-bold">Detail Printer - {{ $data->id_printer }}</h2>
     <div class="flex gap-2">
-      <a href="{{ route('printer.edit',$data->id_printer) }}" class="rounded border px-4 py-2 hover:bg-gray-50">Edit</a>
-      <a href="{{ route('printer.index') }}" class="rounded border px-4 py-2 hover:bg-gray-50">Kembali</a>
+      <a href="{{ route('inventory.printer.edit',$data->id_printer) }}" class="rounded border px-4 py-2 hover:bg-gray-50">Edit</a>
+      <a href="{{ route('inventory.printer.index') }}" class="rounded border px-4 py-2 hover:bg-gray-50">Kembali</a>
     </div>
   </div>
 

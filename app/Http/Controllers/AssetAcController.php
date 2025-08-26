@@ -67,7 +67,7 @@ class AssetAcController extends Controller
         $data->fill($request->only((new AssetAc)->getFillable()));
         $data->save();
 
-        return redirect()->route('ac.index')->with('success','Data AC ditambahkan.');
+        return redirect()->route('inventory.ac.index')->with('success','Data AC ditambahkan.');
     }
 
     public function edit(string $id)
@@ -86,7 +86,7 @@ class AssetAcController extends Controller
         $data->fill($request->only((new AssetAc)->getFillable()));
         $data->save();
 
-        return redirect()->route('ac.index')->with('success','Data AC diperbarui.');
+        return redirect()->route('inventory.ac.index')->with('success','Data AC diperbarui.');
     }
 
     public function destroy(string $id)

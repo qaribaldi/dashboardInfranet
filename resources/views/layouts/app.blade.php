@@ -1,39 +1,44 @@
 <!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <title>@yield('title', 'Infranet Kampus')</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    {{-- CSRF (berguna kalau nanti ada fetch POST/DELETE dari JS) --}}
+<html lang="{{ str_replace('_','-', app()->getLocale()) }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 text-gray-900">
-<div class="min-h-screen flex">
-    {{-- Sidebar --}}
-    <aside class="w-64 bg-white border-r border-gray-200 p-4">
-        <h1 class="text-lg font-bold mb-6">Infranet</h1>
-        <nav class="space-y-2">
-            <a href="{{ route('dashboard') }}"
-               class="block px-3 py-2 rounded-lg hover:bg-gray-100 {{ request()->routeIs('dashboard') ? 'bg-gray-100 font-semibold' : '' }}">
-                Dashboard
-            </a>
-            <div>
-                <a href="{{ route('pc.index') }}"
-                   class="block px-3 py-2 rounded-lg hover:bg-gray-100 {{ str_starts_with(request()->path(),'inventory') ? 'bg-gray-50 font-semibold' : '' }}">
-                    Inventory
-                </a>
-                <!-- <div class="mt-1 ml-3 space-y-1">
-                    <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('pc.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('pc.index') }}">PC</a>
-                    <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('printer.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('printer.index') }}">Printer</a>
-                    <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('proyektor.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('proyektor.index') }}">Proyektor</a>
-                    <a class="block px-3 py-1.5 rounded hover:bg-gray-100 {{ request()->routeIs('ac.*') ? 'bg-gray-100 font-semibold' : '' }}" href="{{ route('ac.index') }}">PC</a>
-                </div> -->
-            </div>
-        </nav>
-    </aside>
+    <title>@yield('title', config('app.name','Laravel'))</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    @vite(['resources/css/app.css','resources/js/app.js'])
+  </head>
+  <body class="font-sans antialiased">
+    <div class="min-h-screen flex">
+      {{-- Sidebar kiri --}}
+      @include('layouts.sidebar')
 
-    {{-- Content --}}
+      {{-- Kanan: topbar kecil + konten --}}
+      <div class="flex-1 flex flex-col">
+        {{-- Topbar --}}
+        <header class="h-16 bg-white/60 dark:border-gray-800 flex items-center justify-end px-4">
+          <x-dropdown align="right" width="48">
+            <x-slot name="trigger">
+              <button class="inline-flex items-center px-3 py-2 text-sm rounded-md text-black hover:bg-gray-100 dark:hover:bg-gray-700">
+                <span>{{ Auth::user()->name }}</span>
+                <svg class="ml-1 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+            </x-slot>
+            <x-slot name="content">
+              <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <x-dropdown-link href="{{ route('logout') }}" onclick="event.preventDefault(); this.closest('form').submit();">
+                  {{ __('Log Out') }}
+                </x-dropdown-link>
+              </form>
+            </x-slot>
+          </x-dropdown>
+        </header>
+
+        {{-- Content --}}
     <main class="flex-1 p-6">
         @if (session('success'))
             <div class="mb-4 rounded-lg border border-green-200 bg-green-50 text-green-800 px-4 py-3">
@@ -42,7 +47,6 @@
         @endif
         @yield('content')
     </main>
-</div>
 
 {{-- Modal Global --}}
 <div id="modalOverlay" class="fixed inset-0 z-50 hidden">

@@ -10,8 +10,8 @@
 
   @unless(request('readonly') == '1')
     <div class="flex justify-end gap-2">
-      <a href="{{ route('printer.edit', $data->id_printer) }}" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Edit</a>
-      <form action="{{ route('printer.destroy', $data->id_printer) }}" method="POST" onsubmit="return confirm('Hapus data ini?')">
+      <a href="{{ route('inventory.printer.edit', $data->id_printer) }}" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Edit</a>
+      <form action="{{ route('inventory.printer.destroy', $data->id_printer) }}" method="POST" onsubmit="return confirm('Hapus data ini?')">
         @csrf @method('DELETE')
         <button class="rounded-lg border border-red-300 text-red-700 px-4 py-2 hover:bg-red-50">Hapus</button>
       </form>

@@ -6,22 +6,26 @@
   <h2 class="text-2xl font-bold mb-2">Dashboard DSS</h2>
 
   {{-- Ambang umur aset (mengubah rekomendasi & lokasi) --}}
-  <div class="mb-6 flex items-center gap-3">
-    <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
-    <select id="ageSelect" class="rounded-lg border border-gray-300 px-3 py-2">
-      <option value="3">≥ 3 tahun (early warning)</option>
-      <option value="5" selected>≥ 5 tahun (rekomendasi)</option>
-      <option value="7">≥ 7 tahun (prioritas tinggi)</option>
+<div class="mb-6 flex items-center gap-3">
+  <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
+  <div class="relative">
+    <select id="ageSelect"
+      class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
+      <option value="3">3-4 Tahun (early warning)</option>
+      <option value="5" selected>5-6 Tahun (rekomendasi)</option>
+      <option value="7">7-9 Tahun (prioritas tinggi)</option>
       <option value="10">≥ 10 tahun</option>
     </select>
-    <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
   </div>
+  <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
+</div>
+
 
   {{-- KPI Cards --}}
 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
   <div class="rounded-xl border bg-white p-4">
     <div class="text-sm text-gray-500">Total PC</div>
-    <div id="kpiPc" class="text-2xl font-semibold">-</div>
+    <div id="kpiPc" class="text-2xl font-bold">-</div>
     <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
   </div>
   <div class="rounded-xl border bg-white p-4">
@@ -82,10 +86,17 @@
             <option value="AC">AC</option>
           </select>
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
-          <select id="filterField" class="rounded-lg border border-gray-300 px-3 py-2"></select>
-        </div>
+<div>
+  <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
+  <div class="relative">
+    <select id="filterField"
+      class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
+      <option value="all">Semua</option>
+      <option value="tahun">Tahun</option>
+      <option value="kategori">Kategori</option>
+    </select>
+  </div>
+</div>
         <div class="flex-1">
           <label class="block text-sm font-medium mb-1">Nilai</label>
           <select id="filterValue" class="w-full rounded-lg border border-gray-300 px-3 py-2">
@@ -155,6 +166,14 @@
     <div class="border-b px-4 py-3 flex items-center justify-between">
       <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
       <span class="text-xs text-gray-500">Auto-refresh</span>
+      <form action="{{ route('dashboard.clear-history') }}" method="POST"
+          onsubmit="return confirm('Yakin hapus semua history?')">
+      @csrf
+      @method('DELETE')
+      <button type="submit" class="px-2 py-1 rounded bg-red-600 text-white hover:bg-red-700">
+        Clear History
+      </button>
+    </form>
     </div>
     <div class="p-4 overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -190,7 +209,11 @@
 @push('body-end')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-  const fmt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+  const fmt = new Intl.DateTimeFormat('id-ID', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Jakarta'
+});
 
   let barChart, pieChart;
   let minAge = 5;
@@ -250,7 +273,9 @@
     document.getElementById('kpiProyektorOld').textContent = m.totals.old.proyektor;
     document.getElementById('kpiAcOld').textContent = m.totals.old.ac;
 
-    document.getElementById('lastUpdated').textContent = 'Terakhir diperbarui: ' + fmt.format(new Date(m.now));
+    document.getElementById('lastUpdated').textContent =
+  'Terakhir diperbarui: ' + fmt.format(new Date(m.now_epoch));
+
 
     const bucketLabel = (m.age_bucket && m.age_bucket.label) ? m.age_bucket.label : (m.min_age ?? minAge);
     document.getElementById('ageLabelKpi').textContent = bucketLabel;
@@ -480,10 +505,15 @@
       body.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Belum ada histori 30 hari terakhir.</td></tr>`;
       return;
     }
-    const dt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
+    const dt = new Intl.DateTimeFormat('id-ID', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Jakarta'
+});
+
     body.innerHTML = list.map((h, i) => `
       <tr class="border-t align-top hover:bg-gray-50 cursor-pointer" data-idx="${i}">
-        <td class="px-3 py-2 whitespace-nowrap">${h.ts ? dt.format(new Date(h.ts)) : '-'}</td>
+        <td class="px-3 py-2 whitespace-nowrap">${h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-'}</td>
         <td class="px-3 py-2 font-medium">${h.asset_type} / ${h.asset_id}</td>
         <td class="px-3 py-2">
           <span class="inline-flex items-center px-2 py-0.5 rounded text-xs
@@ -594,9 +624,13 @@
 
     titleEl.textContent = `Perubahan ${h.asset_type} • ${h.asset_id}`;
 
-    const dt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
-    const when = h.ts ? dt.format(new Date(h.ts)) : '-';
-    const changes = parseChanges(h);
+const dt = new Intl.DateTimeFormat('id-ID', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Jakarta'
+});
+const when = h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-';
+const changes = parseChanges(h); // <-- tambahkan ini
 
     const headerHtml = `
       <div class="mb-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
