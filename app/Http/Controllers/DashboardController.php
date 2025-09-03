@@ -18,21 +18,21 @@ class DashboardController extends Controller
     }
 
     public function clearHistory()
-{
-    AssetHistory::truncate(); // hapus semua isi tabel dan reset id
+    {
+        AssetHistory::truncate(); // hapus semua isi tabel dan reset id
 
-    return redirect()->route('dashboard')
-        ->with('status', 'History berhasil dibersihkan!');
-}
+        return redirect()->route('dashboard')
+            ->with('status', 'History berhasil dibersihkan!');
+    }
 
     public function metrics(Request $request)
     {
         // Waktu acuan
-        $nowJakarta = now('Asia/Jakarta');
+        $nowJakarta  = now('Asia/Jakarta');
         $currentYear = (int) $nowJakarta->year;
 
         // === BUCKET UMUR ===
-        $selected = (int) $request->integer('min_age', 5);
+        $selected  = (int) $request->integer('min_age', 5);
         $bucketMap = [
             3  => [3, 4],
             5  => [5, 6],
@@ -79,7 +79,7 @@ class DashboardController extends Controller
             ->whereIn('tahun_pembelian', $years)->groupBy('tahun_pembelian')->pluck('c','y')->toArray();
 
         $bar = [
-            'labels' => $years,
+            'labels'   => $years,
             'datasets' => [
                 'pc'        => array_map(fn($y) => $pcByYear[$y] ?? 0, $years),
                 'printer'   => array_map(fn($y) => $printerByYear[$y] ?? 0, $years),
@@ -179,7 +179,7 @@ class DashboardController extends Controller
             $upgradeList['ac']->toArray()
         ));
 
-        // Distinct options untuk dropdown (kalau nanti dipakai server-side)
+        // Distinct options (opsional)
         $lokasiOptions   = [];
         $spesOptions     = [];
         $ramOptions      = [];
@@ -295,12 +295,13 @@ class DashboardController extends Controller
                 }
 
                 return [
-                    'ts_epoch'   => $tsEpoch, // <- dipakai di Blade
+                    'ts_epoch'   => $tsEpoch,                               // epoch ms (WIB)
                     'asset_type' => strtoupper($h->asset_type),
                     'asset_id'   => $h->asset_id,
                     'action'     => $h->action,
                     'note'       => $h->note,
                     'summary'    => implode('; ', $details),
+                    'edited_by'  => $h->edited_by ?? '-',                   // 👈 nama user pengedit
                 ];
             });
 
@@ -310,8 +311,8 @@ class DashboardController extends Controller
             'now_epoch' => $nowJakarta->getTimestamp()*1000, // epoch WIB (ms)
             'now'       => $nowJakarta->toIso8601String(),
 
-            'min_age' => $selected,
-            'age_bucket' => [
+            'min_age'   => $selected,
+            'age_bucket'=> [
                 'min'   => $ageMin,
                 'max'   => $ageMax,
                 'label' => $ageLabel,

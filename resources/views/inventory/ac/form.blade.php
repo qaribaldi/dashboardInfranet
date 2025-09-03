@@ -14,18 +14,34 @@
     @if($mode === 'edit') @method('PUT') @endif
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      @foreach($fields as $name => $label)
-        <div>
-          <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
-          <input id="{{ $name }}" name="{{ $name }}" 
-                 value="{{ old($name, $data->{$name}) }}"
-                 class="w-full rounded-lg border border-gray-300 px-3 py-2"
-                 {{ $name==='id_ac' && $mode==='edit' ? 'readonly' : '' }}/>
-          @error($name) 
-            <div class="text-sm text-red-600 mt-1">{{ $message }}</div> 
-          @enderror
-        </div>
-      @endforeach
+
+      @php
+  $statusOps = ['available' => 'Available', 'in_use' => 'In Use', 'broken' => 'Broken'];
+@endphp
+
+@foreach($fields as $name => $label)
+  @if($name === 'status')
+    <div>
+      <label class="block text-sm font-medium mb-1" for="status">Status</label>
+      <select id="status" name="status" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+        @foreach($statusOps as $val => $text)
+          <option value="{{ $val }}" {{ old('status', $data->status ?? 'in_use') === $val ? 'selected' : '' }}>
+            {{ $text }}
+          </option>
+        @endforeach
+      </select>
+      @error('status') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+    </div>
+  @else
+    <div>
+      <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
+      <input id="{{ $name }}" name="{{ $name }}" value="{{ old($name, $data->{$name}) }}"
+             class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+    </div>
+  @endif
+@endforeach
+
     </div>
 
     {{-- Catatan histori hanya muncul saat edit --}}

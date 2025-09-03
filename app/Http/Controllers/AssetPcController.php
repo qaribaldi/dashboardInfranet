@@ -8,11 +8,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;        // <-- ADD
-use Illuminate\Support\Facades\Storage;   // <-- ADD
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Auth;
+
 
 class AssetPcController extends Controller
 {
+    /** Nama tabel & primary key */
+    private string $table = 'asset_pc';
+    private string $pk    = 'id_pc';
+    
+    /** Kolom standar (termasuk timestamps) yang diproteksi */
     private array $std = [
         'id_pc','unit_kerja','user','jabatan','ruang','tipe_asset','merk',
         'processor','socket_processor','motherboard','jumlah_slot_ram',
@@ -33,19 +40,22 @@ class AssetPcController extends Controller
         'datetime' => 'dateTime',
     ];
 
+    /** Helper: daftar kolom yang diproteksi (std + timestamps jika belum ada) */
+    private function protectedColumns(): array
+    {
+        return array_unique(array_merge($this->std, ['created_at','updated_at']));
+    }
+
     /** Normalisasi nama kolom ke snake_case aman */
     private function normalize(string $name): string
     {
+        $name = trim($name);
+        if ($name === '') return '';
         $k = Str::snake($name);
         $k = preg_replace('/[^a-z0-9_]/', '_', strtolower($k));
         $k = preg_replace('/_{2,}/', '_', trim($k, '_'));
-
-        // Jika kosong (mis. header CSV kosong/ekstra delimiter), kembalikan '' agar bisa di-skip
         if ($k === '') return '';
-
-        // Jika diawali angka, beri prefix aman
         if (preg_match('/^\d/', $k)) $k = 'x_'.$k;
-
         return $k;
     }
 
@@ -55,18 +65,17 @@ class AssetPcController extends Controller
         // $defs: [ ['name'=>'umur_baterai','type'=>'integer','nullable'=>true], ... ]
         $added = [];
         foreach ($defs as $d) {
-            $col = $this->normalize($d['name'] ?? '');
-            $type = $d['type'] ?? 'string';
+            $col      = $this->normalize($d['name'] ?? '');
+            $type     = $d['type'] ?? 'string';
             $nullable = (bool)($d['nullable'] ?? true);
 
             if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-            if (in_array($col, $this->std, true)) continue; // jangan tumpang tindih kolom standar
-            if (Schema::hasColumn('asset_pc', $col)) continue;
+            if (in_array($col, $this->protectedColumns(), true)) continue; // jangan tumpang tindih kolom standar
+            if (Schema::hasColumn($this->table, $col)) continue;
 
-            Schema::table('asset_pc', function (Blueprint $table) use ($col, $type, $nullable) {
+            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
                 $method = self::TYPE_MAP[$type];
                 $colDef = $table->{$method}($col);
-                if ($method === 'string') $colDef->nullable(); // string default nullable
                 if ($nullable && method_exists($colDef, 'nullable')) $colDef->nullable();
             });
 
@@ -75,15 +84,16 @@ class AssetPcController extends Controller
         return $added;
     }
 
+    /** ========== MANAGE KOLOM DINAMIS ========== */
+
     public function addColumn(Request $request)
     {
         $data = $request->validate([
-            'name'     => ['required','string','max:64','regex:/^[A-Za-z][A-Za-z0-9_]*$/'], // <— diperketat
+            'name'     => ['required','string','max:64','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
             'type'     => ['required','in:string,text,integer,boolean,date,datetime'],
             'nullable' => ['nullable','boolean'],
         ]);
 
-        // pastikan kolom ditambahkan jika belum ada
         $this->ensureColumns([[
             'name'     => $data['name'],
             'type'     => $data['type'],
@@ -93,27 +103,85 @@ class AssetPcController extends Controller
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');
     }
 
+    /** Ubah nama kolom dinamis */
+    public function renameColumn(Request $request)
+    {
+        $data = $request->validate([
+            'from' => ['required','string','max:64'],
+            'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+        ]);
+
+        $from = $this->normalize($data['from']);
+        $to   = $this->normalize($data['to']);
+
+        if ($from === '' || $to === '') {
+            return back()->with('error','Nama kolom tidak valid.');
+        }
+
+        if (in_array($from, $this->protectedColumns(), true)) {
+            return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+        }
+        if (!Schema::hasColumn($this->table, $from)) {
+            return back()->with('error',"Kolom '$from' tidak ditemukan.");
+        }
+        if (Schema::hasColumn($this->table, $to)) {
+            return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
+        }
+
+        // Renaming butuh doctrine/dbal
+        // composer require doctrine/dbal
+        Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
+            $table->renameColumn($from, $to);
+        });
+
+        return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
+    }
+
+    /** Hapus kolom dinamis */
+    public function dropColumn(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required','string','max:64'],
+        ]);
+
+        $col = $this->normalize($data['name']);
+        if ($col === '') return back()->with('error','Nama kolom tidak valid.');
+
+        if (in_array($col, $this->protectedColumns(), true)) {
+            return back()->with('error','Tidak boleh menghapus kolom standar.');
+        }
+        if (!Schema::hasColumn($this->table, $col)) {
+            return back()->with('error',"Kolom '$col' tidak ditemukan.");
+        }
+
+        Schema::table($this->table, function (Blueprint $table) use ($col) {
+            $table->dropColumn($col);
+        });
+
+        return back()->with('success',"Kolom '$col' berhasil dihapus.");
+    }
+
     /** Ambil semua kolom tabel lalu bedakan mana ekstra */
     private function extraColumns(): array
     {
-        $all = Schema::getColumnListing('asset_pc');
-        return array_values(array_diff($all, $this->std));
+        $all = Schema::getColumnListing($this->table);
+        return array_values(array_diff($all, $this->protectedColumns()));
     }
 
-    // ================== LIST ==================
+    /** ========== LIST ========== */
     public function index(Request $request)
     {
         $columns = [
-            'id_pc' => 'ID PC',
-            'unit_kerja' => 'Unit Kerja',
-            'user' => 'User',
-            'ruang' => 'Ruang',
-            'merk' => 'Merk',
-            'processor' => 'Processor',
+            'id_pc'               => 'ID PC',
+            'unit_kerja'          => 'Unit Kerja',
+            'user'                => 'User',
+            'ruang'               => 'Ruang',
+            'merk'                => 'Merk',
+            'processor'           => 'Processor',
             'total_kapasitas_ram' => 'Total RAM',
-            'storage_1' => 'Storage 1',
-            'operating_sistem' => 'OS',
-            'tahun_pembelian' => 'Tahun',
+            'storage_1'           => 'Storage 1',
+            'operating_sistem'    => 'OS',
+            'tahun_pembelian'     => 'Tahun',
         ];
 
         $q    = trim((string) $request->query('q', ''));
@@ -149,7 +217,7 @@ class AssetPcController extends Controller
             });
         }
 
-        $items = $base->orderBy('id_pc')->paginate(12)->appends($request->query());
+        $items = $base->orderBy($this->pk)->paginate(12)->appends($request->query());
 
         $processors = AssetPc::whereNotNull('processor')->where('processor','<>','')
             ->distinct()->orderBy('processor')->pluck('processor');
@@ -170,42 +238,36 @@ class AssetPcController extends Controller
         ));
     }
 
-    // ================== FORM ==================
+    /** ========== FORM ========== */
     public function create()
     {
-        $columns = Schema::getColumnListing('asset_pc');
-        $skip = ['created_at','updated_at']; // kolom yang tidak mau ditampilkan
-        $fields = [];
+        $columns = Schema::getColumnListing($this->table);
+        $skip    = ['created_at','updated_at']; // kolom yang tidak mau ditampilkan
+        $fields  = [];
         foreach ($columns as $col) {
             if (in_array($col,$skip)) continue;
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
         return view('inventory.pc.form', [
-            'mode'=>'create',
-            'fields'=>$fields,
-            'data'=>new AssetPc()
+            'mode'  => 'create',
+            'fields'=> $fields,
+            'data'  => new AssetPc()
         ]);
     }
 
     public function store(Request $request)
     {
-        // kolom nyata di DB
-        $columns = Schema::getColumnListing('asset_pc');
-        $skip = ['created_at','updated_at'];              // kolom yang tidak diisi manual
+        $columns  = Schema::getColumnListing($this->table);
+        $skip     = ['created_at','updated_at'];
         $writable = array_values(array_diff($columns,$skip));
 
-        // validasi minimal
         $request->validate([
-            'id_pc' => 'required|string|unique:asset_pc,id_pc',
-            'tahun_pembelian' => 'nullable|integer',
+            $this->pk           => 'required|string|unique:'.$this->table.','.$this->pk,
+            'tahun_pembelian'   => 'nullable|integer',
         ]);
 
-        // hanya ambil field yang benar-benar ada di DB
         $input = $request->only($writable);
-
-        // kalau pakai mass assignment dinamis, pastikan di model:
-        // protected $guarded = [];  (atau tambahkan ke $fillable)
         AssetPc::create($input);
 
         return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil ditambahkan.');
@@ -213,60 +275,54 @@ class AssetPcController extends Controller
 
     public function edit(AssetPc $pc)
     {
-        $columns = Schema::getColumnListing('asset_pc');
-        $skip = ['created_at','updated_at'];
-        $fields = [];
+        $columns = Schema::getColumnListing($this->table);
+        $skip    = ['created_at','updated_at'];
+        $fields  = [];
         foreach ($columns as $col) {
             if (in_array($col,$skip)) continue;
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
         return view('inventory.pc.form', [
-            'mode'=>'edit',
-            'fields'=>$fields,
-            'data'=>$pc
+            'mode'  => 'edit',
+            'fields'=> $fields,
+            'data'  => $pc
         ]);
     }
 
     public function update(Request $request, AssetPc $pc)
     {
-        // whitelist dari DB
-        $columns = Schema::getColumnListing('asset_pc');
-        $skip = ['created_at','updated_at'];
+        $columns  = Schema::getColumnListing($this->table);
+        $skip     = ['created_at','updated_at'];
         $writable = array_values(array_diff($columns,$skip));
 
-        // validasi minimal
         $request->validate([
-            'id_pc' => 'required|string|unique:asset_pc,id_pc,'.$pc->id_pc.',id_pc',
+            $this->pk         => 'required|string|unique:'.$this->table.','.$this->pk.','.$pc->{$this->pk}.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
-            // note: 'catatan_histori' jangan divalidasi sebagai kolom DB
         ]);
 
-        // ambil input yang benar2 ada di DB
-        $input = $request->only($writable);
-
-        // simpan nilai lama buat history
+        $input  = $request->only($writable);
         $before = $pc->only(array_keys($input));
 
-        // isi & cek perubahan
         $pc->fill($input);
         $dirty = $pc->getDirty();
+        $pc->save();
 
-        $pc->save();   // <— sekarang tidak akan pernah mencoba field yang tidak ada
-
-        // catat history bila ada perubahan
         if (!empty($dirty)) {
             $changes = [];
             foreach ($dirty as $k => $newVal) {
                 $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
             }
 
+            $userName = auth()->user()->name ?? 'System';
+
             AssetHistory::create([
                 'asset_type'   => 'pc',
-                'asset_id'     => $pc->id_pc,
-                'action'       => 'update',   // atau logicmu sendiri
+                'asset_id'     => $pc->{$this->pk},
+                'action'       => 'update',
                 'changes_json' => $changes,
-                'note'         => $request->input('catatan_histori'), // ini bukan kolom asset_pc
+                'note'         => $request->input('catatan_histori'),
+                'edited_by'    => $userName, 
                 'created_at'   => now('Asia/Jakarta'),
             ]);
         }
@@ -276,6 +332,18 @@ class AssetPcController extends Controller
 
     public function destroy(AssetPc $pc)
     {
+
+        $userName = auth()->user()->name ?? 'System';
+
+    AssetHistory::create([
+        'asset_type'   => 'pc',
+        'asset_id'     => $pc->{$this->pk},
+        'action'       => 'delete',
+        'changes_json' => null,
+        'note'         => null,
+        'edited_by'    => $userName,  // 👈 ditambah
+        'created_at'   => now('Asia/Jakarta'),
+    ]);
         $pc->delete();
         return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil dihapus.');
     }
@@ -283,19 +351,18 @@ class AssetPcController extends Controller
     public function show(AssetPc $pc)
     {
         $cols = array_values(array_diff(
-            Schema::getColumnListing('asset_pc'),
+            Schema::getColumnListing($this->table),
             ['created_at','updated_at']
         ));
 
-        // Kirim juga primary key untuk tombol Edit/Hapus jika butuh
         return view('inventory.pc._detail', [
             'data' => $pc,
             'cols' => $cols,
-            'pk'   => 'id_pc',
+            'pk'   => $this->pk,
         ]);
     }
 
-    // ================== NEW: IMPORT CSV ==================
+    /** ========== IMPORT CSV ========== */
 
     /** Form import CSV */
     public function importForm()
@@ -316,7 +383,7 @@ class AssetPcController extends Controller
             'operating_sistem','monitor','keyboard','mouse','tahun_pembelian'
         ];
 
-        // 1 baris contoh (silakan edit kalau mau)
+        // 1 baris contoh
         $sample = [
             'PC-001','BAAK','Budi','Staff','R101','Aset Tetap','HP',
             'Intel Core i3-3240','LGA1155','Asus H61M','2',
@@ -326,7 +393,7 @@ class AssetPcController extends Controller
             'Windows 10','Samsung 19"','Logitech','Logitech','2019'
         ];
 
-        // Buat CSV (quote jika ada koma/quote)
+        // Buat CSV
         $toCsvLine = function(array $fields): string {
             $escaped = array_map(function($v) {
                 $v = (string)$v;
@@ -355,7 +422,7 @@ class AssetPcController extends Controller
     public function importStore(Request $request)
     {
         $data = $request->validate([
-            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'], // 5MB
+            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'],
             'mode' => ['required','in:upsert,insert_only'],
             'auto_add_columns' => ['nullable','boolean'],
         ]);
@@ -377,7 +444,6 @@ class AssetPcController extends Controller
         // Deteksi delimiter sederhana dari baris pertama
         $firstLine = fgets($fh) ?: '';
         $delimiter = (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
-        // reset pointer setelah fgets
         rewind($fh);
 
         // Baca header
@@ -404,16 +470,14 @@ class AssetPcController extends Controller
         }
 
         // Cek kolom yang belum ada
-        $existingCols = Schema::getColumnListing('asset_pc');
+        $existingCols = Schema::getColumnListing($this->table);
         $unknown = array_values(array_diff($normHeaders, $existingCols));
 
         if (!empty($unknown)) {
             if ($allowAutoCol) {
-                // Tambah kolom baru sebagai STRING nullable
                 $defs = array_map(fn($c) => ['name'=>$c,'type'=>'string','nullable'=>true], $unknown);
                 $this->ensureColumns($defs);
-                // refresh kolom
-                $existingCols = Schema::getColumnListing('asset_pc');
+                $existingCols = Schema::getColumnListing($this->table);
             } else {
                 fclose($fh);
                 return back()->with('error',
@@ -424,7 +488,7 @@ class AssetPcController extends Controller
         }
 
         // Kolom yang boleh diisi (hindari created_at/updated_at)
-        $skip = ['created_at','updated_at'];
+        $skip     = ['created_at','updated_at'];
         $writable = array_values(array_diff($existingCols, $skip));
 
         $inserted = 0;
@@ -454,18 +518,18 @@ class AssetPcController extends Controller
                     $rowKept = array_pad($rowKept, count($normHeaders), null);
                 }
 
-                // Gabungkan header->value (sudah selaras)
+                // Gabungkan header->value
                 $assoc = array_combine($normHeaders, $rowKept);
 
                 // Minimal wajib id_pc
-                $id = trim((string)($assoc['id_pc'] ?? ''));
+                $id = trim((string)($assoc[$this->pk] ?? ''));
                 if ($id === '') {
                     $skipped++;
-                    $errors[] = "Baris $rowNum: kolom 'id_pc' kosong — dilewati.";
+                    $errors[] = "Baris $rowNum: kolom '{$this->pk}' kosong — dilewati.";
                     continue;
                 }
 
-                // Casting ringan: tahun_pembelian -> int/null
+                // Casting ringan
                 if (isset($assoc['tahun_pembelian'])) {
                     $tp = trim((string)$assoc['tahun_pembelian']);
                     $assoc['tahun_pembelian'] = ($tp === '' ? null : (int)$tp);
@@ -483,22 +547,22 @@ class AssetPcController extends Controller
                 $payload = array_intersect_key($assoc, array_flip($writable));
 
                 // Pastikan primary key ada
-                $payload['id_pc'] = $id;
+                $payload[$this->pk] = $id;
 
                 // INSERT / UPSERT
                 if ($mode === 'upsert') {
-                    $exists = AssetPc::where('id_pc',$id)->exists();
+                    $exists = AssetPc::where($this->pk,$id)->exists();
                     AssetPc::updateOrCreate(
-                        ['id_pc' => $id],
+                        [$this->pk => $id],
                         $payload
                     );
                     $exists ? $updated++ : $inserted++;
                 } else {
                     // insert only — skip jika sudah ada
-                    $exists = AssetPc::where('id_pc',$id)->exists();
+                    $exists = AssetPc::where($this->pk,$id)->exists();
                     if ($exists) {
                         $skipped++;
-                        $errors[] = "Baris $rowNum: id_pc '$id' sudah ada — dilewati (mode insert_only).";
+                        $errors[] = "Baris $rowNum: {$this->pk} '$id' sudah ada — dilewati (mode insert_only).";
                         continue;
                     }
                     AssetPc::create($payload);

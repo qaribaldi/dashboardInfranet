@@ -10,7 +10,7 @@ class AssetHistory extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'asset_type','asset_id','action','changes_json','note','created_at'
+        'asset_type','asset_id','action','changes_json','note','created_at','edited_by'
     ];
 
     protected $casts = [

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class AssetProyektorController extends Controller
 {
@@ -93,6 +94,70 @@ class AssetProyektorController extends Controller
 
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');
     }
+
+    public function renameColumn(Request $request)
+{
+    $data = $request->validate([
+        'from' => ['required','string','max:64'],
+        'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+    ]);
+
+    $from = $this->normalize($data['from']);
+    $to   = $this->normalize($data['to']);
+
+    if ($from === '' || $to === '') {
+        return back()->with('error','Nama kolom tidak valid.');
+    }
+
+    // lindungi kolom standar
+    $protected = $this->std ?? [];
+    if (in_array($from, $protected, true)) {
+        return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+    }
+
+    if (!Schema::hasColumn($this->table, $from)) {
+        return back()->with('error',"Kolom '$from' tidak ditemukan.");
+    }
+
+    if (Schema::hasColumn($this->table, $to)) {
+        return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
+    }
+
+    // Renaming butuh doctrine/dbal
+    // composer require doctrine/dbal
+    Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
+        $table->renameColumn($from, $to);
+    });
+
+    return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
+}
+
+/** DROP kolom dinamis */
+public function dropColumn(Request $request)
+{
+    $data = $request->validate([
+        'name' => ['required','string','max:64'],
+    ]);
+
+    $col = $this->normalize($data['name']);
+    if ($col === '') return back()->with('error','Nama kolom tidak valid.');
+
+    // lindungi kolom standar
+    $protected = $this->std ?? [];
+    if (in_array($col, $protected, true)) {
+        return back()->with('error','Tidak boleh menghapus kolom standar.');
+    }
+
+    if (!Schema::hasColumn($this->table, $col)) {
+        return back()->with('error',"Kolom '$col' tidak ditemukan.");
+    }
+
+    Schema::table($this->table, function (Blueprint $table) use ($col) {
+        $table->dropColumn($col);
+    });
+
+    return back()->with('success',"Kolom '$col' berhasil dihapus.");
+}
 
     private function extraColumns(): array
     {
@@ -244,12 +309,14 @@ class AssetProyektorController extends Controller
             foreach ($dirty as $k => $newVal) {
                 $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
             }
+            $userName = auth()->user()->name ?? 'System';
             AssetHistory::create([
                 'asset_type'   => 'proyektor',
                 'asset_id'     => $proyektor->{$this->pk},
                 'action'       => 'update',
                 'changes_json' => $changes,
                 'note'         => $request->input('catatan_histori'),
+                'edited_by'    => $userName,
                 'created_at'   => now('Asia/Jakarta'),
             ]);
         }
@@ -259,6 +326,16 @@ class AssetProyektorController extends Controller
 
     public function destroy(AssetProyektor $proyektor)
     {
+        $userName = auth()->user()->name ?? 'System';
+        AssetHistory::create([
+        'asset_type'   => 'proyektor',
+        'asset_id'     => $proyektor->{$this->pk},
+        'action'       => 'delete',
+        'changes_json' => null,
+        'note'         => null,
+        'edited_by'    => $userName, // 👈 ditambah
+        'created_at'   => now('Asia/Jakarta'),
+    ]);
         $proyektor->delete();
         return redirect()->route('inventory.proyektor.index')->with('success','Aset Proyektor berhasil dihapus.');
     }

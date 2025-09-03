@@ -7,49 +7,63 @@
   <h2 class="text-2xl font-bold mb-2">Dashboard DSS</h2>
 
   {{-- Ambang umur aset (mengubah rekomendasi & lokasi) --}}
-<div class="mb-6 flex items-center gap-3">
-  <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
-  <div class="relative">
-    <select id="ageSelect"
-      class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
-      <option value="3">3-4 Tahun (early warning)</option>
-      <option value="5" selected>5-6 Tahun (rekomendasi)</option>
-      <option value="7">7-9 Tahun (prioritas tinggi)</option>
-      <option value="10">≥ 10 tahun</option>
-    </select>
+  <div class="mb-6 flex items-center gap-3">
+    <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
+    <div class="relative">
+      <select id="ageSelect"
+        class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
+        <option value="3">3-4 Tahun (early warning)</option>
+        <option value="5" selected>5-6 Tahun (rekomendasi)</option>
+        <option value="7">7-9 Tahun (prioritas tinggi)</option>
+        <option value="10">≥ 10 tahun</option>
+      </select>
+    </div>
+    <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
   </div>
-  <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
-</div>
-
 
   {{-- KPI Cards --}}
-<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-  <div class="rounded-xl border bg-white p-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+  {{-- Total Aset --}}
+  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+    <div class="text-sm text-gray-500">Total Keseluruhan Aset</div>
+    <div id="kpiAll" class="text-2xl font-extrabold">-</div>
+    <div class="text-xs text-gray-500 mt-1">PC + Printer + Proyektor + AC</div>
+  </div>
+
+  {{-- Total PC --}}
+  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
     <div class="text-sm text-gray-500">Total PC</div>
     <div id="kpiPc" class="text-2xl font-bold">-</div>
     <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
   </div>
-  <div class="rounded-xl border bg-white p-4">
+
+  {{-- Total Printer --}}
+  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
     <div class="text-sm text-gray-500">Total Printer</div>
     <div id="kpiPrinter" class="text-2xl font-semibold">-</div>
     <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiPrinterOld">-</span></div>
   </div>
-  <div class="rounded-xl border bg-white p-4">
+
+  {{-- Total Proyektor --}}
+  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
     <div class="text-sm text-gray-500">Total Proyektor</div>
     <div id="kpiProyektor" class="text-2xl font-semibold">-</div>
     <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiProyektorOld">-</span></div>
   </div>
-  <div class="rounded-xl border bg-white p-4">
+
+  {{-- Total AC --}}
+  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
     <div class="text-sm text-gray-500">Total AC</div>
     <div id="kpiAc" class="text-2xl font-semibold">-</div>
     <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiAcOld">-</span></div>
   </div>
+</div> {{-- <- PASTIKAN div grid ini ditutup DI SINI --}}
+
+{{-- ini DI LUAR grid KPI --}}
+<div class="mb-6 text-sm text-gray-500">
+  <span id="lastUpdated">Terakhir diperbarui: -</span>
 </div>
 
-
-  <div class="mb-6 text-sm text-gray-500">
-    <span id="lastUpdated">Terakhir diperbarui: -</span>
-  </div>
 
   {{-- Charts --}}
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -68,7 +82,7 @@
     </div>
   </div>
 
-  {{-- Notifikasi Upgrade + FILTER BAR --}}
+  {{-- Rekomendasi Upgrade + FILTER BAR --}}
   <div class="mt-6 rounded-xl border bg-white">
     <div class="border-b px-4 py-3 flex items-center justify-between">
       <h3 class="font-semibold">Rekomendasi Upgrade (Umur <span id="ageLabelNotif">5</span> tahun)</h3>
@@ -87,23 +101,24 @@
             <option value="AC">AC</option>
           </select>
         </div>
-<div>
-  <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
-  <div class="relative">
-    <select id="filterField"
-      class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
-      <option value="all">Semua</option>
-      <option value="tahun">Tahun</option>
-      <option value="kategori">Kategori</option>
-    </select>
-  </div>
-</div>
+
+        <div>
+          <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
+          <div class="relative">
+            <select id="filterField"
+              class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
+              {{-- Options diisi via JS --}}
+            </select>
+          </div>
+        </div>
+
         <div class="flex-1">
           <label class="block text-sm font-medium mb-1">Nilai</label>
           <select id="filterValue" class="w-full rounded-lg border border-gray-300 px-3 py-2">
             <option value="" selected>Semua</option>
           </select>
         </div>
+
         <div class="flex gap-2">
           <button id="btnApplyFilter" class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Filter</button>
           <button id="btnResetFilter" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Reset</button>
@@ -154,33 +169,31 @@
               <th class="text-left px-3 py-2">Total</th>
             </tr>
           </thead>
-         <tbody id="lokasiRawanBody">
+          <tbody id="lokasiRawanBody">
             <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
-         </tbody>
+          </tbody>
         </table>
       </div>
     </div>
   </div>
 
   {{-- Histori Perbaikan/Upgrade (30 hari) --}}
-  <div class="border-b px-4 py-3 flex items-center justify-between">
-  <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
-
-  <div class="flex items-center gap-3">
-    {{-- FILTER TIPE ASET --}}
-    <div class="flex items-center gap-2">
-      <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
-      <select id="hisType" class="rounded border px-2 py-1 text-sm">
-        <option value="ALL" selected>Semua</option>
-        <option value="PC">PC</option>
-        <option value="Printer">Printer</option>
-        <option value="Proyektor">Proyektor</option>
-        <option value="AC">AC</option>
-      </select>
+  <div class="mt-6 rounded-xl border bg-white">
+    <div class="border-b px-4 py-3 flex items-center justify-between">
+      <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
+          <select id="hisType" class="rounded border px-2 py-1 text-sm">
+            <option value="ALL" selected>Semua</option>
+            <option value="PC">PC</option>
+            <option value="Printer">Printer</option>
+            <option value="Proyektor">Proyektor</option>
+            <option value="AC">AC</option>
+          </select>
+        </div>
+      </div>
     </div>
-
-  </div>
-</div>
 
     <div class="p-4 overflow-x-auto">
       <table class="min-w-full text-sm">
@@ -191,19 +204,18 @@
             <th class="text-left px-3 py-2">Aksi</th>
             <th class="text-left px-3 py-2">Perubahan</th>
             <th class="text-left px-3 py-2">Catatan</th>
+            <th class="text-left px-3 py-2">Edited By</th>
           </tr>
         </thead>
         <tbody id="historyBody">
-          <tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
+          <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
         </tbody>
       </table>
-       {{-- tombol pagination --}}
-  <div class="mt-3 flex items-center justify-end gap-2">
-    <button id="hisPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
-    <span id="hisPageInfo" class="text-sm text-gray-600">-</span>
-    <button id="hisNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
-  </div>
-</div>
+      <div class="mt-3 flex items-center justify-end gap-2">
+        <button id="hisPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
+        <span id="hisPageInfo" class="text-sm text-gray-600">-</span>
+        <button id="hisNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
+      </div>
     </div>
   </div>
 
@@ -223,24 +235,21 @@
 @push('body-end')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-  const fmt = new Intl.DateTimeFormat('id-ID', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'Asia/Jakarta'
-});
+  const fmt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' });
 
   let barChart, pieChart;
   let minAge = 5;
+
   const PAGE_SIZE = 10;
   let pageUp = 1;
   let upgradeAll = [];
   let upgradeFiltered = [];
   let lastMetrics = null;
 
-const HISTORY_PAGE_SIZE = 10;
-  let historyAll = [];         
-  let historyFiltered = [];    
-  let historyType = 'ALL';    
+  const HISTORY_PAGE_SIZE = 10;
+  let historyAll = [];
+  let historyFiltered = [];
+  let hisType = 'ALL';
   let pageHistory = 1;
 
   let assetType = 'ALL';
@@ -288,14 +297,17 @@ const HISTORY_PAGE_SIZE = 10;
     document.getElementById('kpiProyektor').textContent = m.totals.proyektor;
     document.getElementById('kpiAc').textContent = m.totals.ac;
 
+    // BARU: total semua aset
+  const totalAll = (m.totals.pc || 0) + (m.totals.printer || 0) + (m.totals.proyektor || 0) + (m.totals.ac || 0);
+  const elAll = document.getElementById('kpiAll');
+  if (elAll) elAll.textContent = totalAll;
+
     document.getElementById('kpiPcOld').textContent = m.totals.old.pc;
     document.getElementById('kpiPrinterOld').textContent = m.totals.old.printer;
     document.getElementById('kpiProyektorOld').textContent = m.totals.old.proyektor;
     document.getElementById('kpiAcOld').textContent = m.totals.old.ac;
 
-    document.getElementById('lastUpdated').textContent =
-  'Terakhir diperbarui: ' + fmt.format(new Date(m.now_epoch));
-
+    document.getElementById('lastUpdated').textContent = 'Terakhir diperbarui: ' + fmt.format(new Date(m.now_epoch));
 
     const bucketLabel = (m.age_bucket && m.age_bucket.label) ? m.age_bucket.label : (m.min_age ?? minAge);
     document.getElementById('ageLabelKpi').textContent = bucketLabel;
@@ -309,8 +321,7 @@ const HISTORY_PAGE_SIZE = 10;
       { label: 'PC', data: m.bar.datasets.pc, backgroundColor: colors.pc },
       { label: 'Printer', data: m.bar.datasets.printer, backgroundColor: colors.printer },
       { label: 'Proyektor', data: m.bar.datasets.proyektor, backgroundColor: colors.proyektor },
-      { label: 'AC',        data: m.bar.datasets.ac,        backgroundColor: colors.ac },
-      
+      { label: 'AC', data: m.bar.datasets.ac, backgroundColor: colors.ac },
     ];
     barChart.update();
   }
@@ -350,7 +361,7 @@ const HISTORY_PAGE_SIZE = 10;
     AC: [
       { key: 'lokasi', label: 'Unit / Ruang' },
       { key: 'spes',   label: 'Merk' },
-      { key: 'remote',  label: 'Remote' },  
+      { key: 'remote', label: 'Remote' },
     ],
     ALL: [
       { key: 'lokasi', label: 'Unit / Ruang' },
@@ -406,7 +417,6 @@ const HISTORY_PAGE_SIZE = 10;
       options = [''].concat(vals);
     }
 
-
     sel.innerHTML = options.map(v => `<option value="${v}">${v || 'Semua'}</option>`).join('');
     if (preservedValue && options.includes(preservedValue)) {
       sel.value = preservedValue;
@@ -441,7 +451,6 @@ const HISTORY_PAGE_SIZE = 10;
       } else if (filterField === 'remote') {
         list = list.filter(u => (u.remote ?? '') === filterValue);
       }
-
     }
 
     upgradeFiltered = list;
@@ -502,7 +511,7 @@ const HISTORY_PAGE_SIZE = 10;
     const tbody = document.getElementById('lokasiRawanBody');
     const arr = m.lokasi_rawan || [];
     if (!arr.length) {
-      tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">Tidak ada data.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Tidak ada data.</td></tr>`;
       return;
     }
     tbody.innerHTML = arr.map(r => `
@@ -517,110 +526,70 @@ const HISTORY_PAGE_SIZE = 10;
     `).join('');
   }
 
-  // ===== History (klik baris => modal diff) =====
+  // ===== History (AJAX) =====
   function updateHistory(m) {
-  historyAll = Array.isArray(m.history) ? m.history : [];
-  applyHistoryFilter(true); // reset ke page 1
-}
-
-function applyHistoryFilter(resetPage = true) {
-  const sel = document.getElementById('hisType');
-  hisType = sel ? (sel.value || 'ALL') : 'ALL';
-
-  let list = historyAll;
-  if (hisType !== 'ALL') {
-    const target = hisType.toUpperCase();
-    list = historyAll.filter(h => (h.asset_type || '').toUpperCase() === target);
-  }
-  historyFiltered = list;
-
-  if (resetPage) pageHistory = 1;
-  renderHistoryPage(historyFiltered);
-}
-
-function renderHistoryPage(list) {
-  const body = document.getElementById('historyBody');
-  const total = list.length;
-  const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
-  pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
-
-  document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
-
-  if (!total) {
-    body.innerHTML = `<tr><td colspan="5" class="px-3 py-4 text-center text-gray-500">
-      Belum ada histori 30 hari terakhir.
-    </td></tr>`;
-    return;
+    historyAll = Array.isArray(m.history) ? m.history : [];
+    applyHistoryFilter(true); // reset ke page 1
   }
 
-  const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
-  const rows = list.slice(start, start + HISTORY_PAGE_SIZE);
+  function applyHistoryFilter(resetPage = true) {
+    const sel = document.getElementById('hisType');
+    hisType = sel ? (sel.value || 'ALL') : 'ALL';
 
-  const dt = new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Asia/Jakarta'
-  });
+    let list = historyAll;
+    if (hisType !== 'ALL') {
+      const target = hisType.toUpperCase();
+      list = historyAll.filter(h => (h.asset_type || '').toUpperCase() === target);
+    }
+    historyFiltered = list;
 
-  body.innerHTML = rows.map((h, i) => `
-    <tr class="border-t align-top hover:bg-gray-50 cursor-pointer" data-idx="${start + i}">
-      <td class="px-3 py-2 whitespace-nowrap">${h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-'}</td>
-      <td class="px-3 py-2 font-medium">${h.asset_type} / ${h.asset_id}</td>
-      <td class="px-3 py-2">
-        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs
-          ${h.action==='upgrade' ? 'bg-blue-100 text-blue-700' :
-            (h.action==='repair' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700')}">
-          ${h.action}
-        </span>
-      </td>
-      <td class="px-3 py-2">${h.summary ? h.summary.replace(/</g,'&lt;') : '-'}</td>
-      <td class="px-3 py-2">${h.note ? h.note.replace(/</g,'&lt;') : '-'}</td>
-    </tr>
-  `).join('');
-
-  // Pagination handlers
-  document.getElementById('hisPrev').onclick = () => { pageHistory--; renderHistoryPage(list); };
-  document.getElementById('hisNext').onclick = () => { pageHistory++; renderHistoryPage(list); };
-}
-
-// ====== EVENT: dropdown filter ======
-document.addEventListener('DOMContentLoaded', () => {
-  const sel = document.getElementById('hisType');
-  if (sel) sel.addEventListener('change', () => applyHistoryFilter(true));
-});
-
-// ====== CLICK ROW: buka modal diff dari list yang terfilter ======
-document.getElementById('historyBody').addEventListener('click', (e) => {
-  const tr = e.target.closest('tr[data-idx]');
-  if (!tr) return;
-
-  const idx = parseInt(tr.dataset.idx, 10);
-  // idx di table = indeks global di 'historyFiltered' pada halaman saat ini.
-  // Ambil item sesuai tampilan sekarang:
-  const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
-  const item = historyFiltered[start + (idx - start)];
-  if (!item) return;
-
-  openHistoryModal(item);
-});
-
-  async function fetchMetrics() {
-    const url = "{{ route('dashboard.metrics') }}" + `?min_age=${minAge}`;
-    try {
-      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
-      const metrics = await res.json();
-      lastMetrics = metrics;
-
-      updateKpis(metrics);
-      updateBar(metrics);
-      updatePie(metrics);
-      updateUpgradeTable(metrics);
-      updateLokasiRawan(metrics);
-      updateHistory(metrics);
-    } catch (e) { console.error(e); }
+    if (resetPage) pageHistory = 1;
+    renderHistoryPage(historyFiltered);
   }
 
-  // ===== Modal helpers =====
+  function renderHistoryPage(list) {
+    const body = document.getElementById('historyBody');
+    const total = list.length;
+    const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+    pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
+
+    document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
+
+    if (!total) {
+      body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
+        Belum ada histori 30 hari terakhir.
+      </td></tr>`;
+      return;
+    }
+
+    const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
+    const rows = list.slice(start, start + HISTORY_PAGE_SIZE);
+
+    const dt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' });
+
+    body.innerHTML = rows.map((h, i) => `
+      <tr class="border-t align-top hover:bg-gray-50 cursor-pointer" data-idx="${start + i}">
+        <td class="px-3 py-2 whitespace-nowrap">${h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-'}</td>
+        <td class="px-3 py-2 font-medium">${h.asset_type} / ${h.asset_id}</td>
+        <td class="px-3 py-2">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs
+            ${h.action==='upgrade' ? 'bg-blue-100 text-blue-700' :
+              (h.action==='repair' ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-700')}">
+            ${h.action}
+          </span>
+        </td>
+        <td class="px-3 py-2">${h.summary ? h.summary.replace(/</g,'&lt;') : '-'}</td>
+        <td class="px-3 py-2">${h.note ? h.note.replace(/</g,'&lt;') : '-'}</td>
+        <td class="px-3 py-2">${h.edited_by ? h.edited_by.replace(/</g,'&lt;') : '-'}</td>
+      </tr>
+    `).join('');
+
+    // Pagination handlers
+    document.getElementById('hisPrev').onclick = () => { pageHistory--; renderHistoryPage(list); };
+    document.getElementById('hisNext').onclick = () => { pageHistory++; renderHistoryPage(list); };
+  }
+
+  // ====== DETAIL INVENTORY (modal) ======
   function openModal() {
     const modal = document.getElementById('assetModal');
     modal.classList.remove('hidden');
@@ -640,7 +609,6 @@ document.getElementById('historyBody').addEventListener('click', (e) => {
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
-  // ====== DETAIL INVENTORY: muat HTML inventory lengkap ke modal ======
   async function openDetailModal(type, id) {
     const base = SHOW_URLS[type];
     if (!base || !id) return;
@@ -666,9 +634,8 @@ document.getElementById('historyBody').addEventListener('click', (e) => {
     }
   }
 
-  // ====== HISTORI: parse & tampilkan hanya field yang berubah ======
+  // ====== HISTORI: parse & tampilkan field berubah (untuk modal) ======
   function parseChanges(h) {
-    // gunakan h.changes bila tersedia (array of {field,key,from,to})
     if (Array.isArray(h.changes) && h.changes.length) {
       return h.changes.map(c => ({
         field: c.field ?? c.key ?? '',
@@ -676,7 +643,6 @@ document.getElementById('historyBody').addEventListener('click', (e) => {
         to:    c.to ?? '',
       })).filter(x => x.field && (x.from !== x.to));
     }
-    // fallback dari summary "field: from → to; ..."
     const out = [];
     const txt = (h.summary || '').trim();
     if (!txt) return out;
@@ -701,18 +667,15 @@ document.getElementById('historyBody').addEventListener('click', (e) => {
 
     titleEl.textContent = `Perubahan ${h.asset_type} • ${h.asset_id}`;
 
-const dt = new Intl.DateTimeFormat('id-ID', {
-  dateStyle: 'medium',
-  timeStyle: 'short',
-  timeZone: 'Asia/Jakarta'
-});
-const when = h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-';
-const changes = parseChanges(h); // <-- tambahkan ini
+    const dt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' });
+    const when = h.ts_epoch ? dt.format(new Date(h.ts_epoch)) : '-';
+    const changes = parseChanges(h);
 
     const headerHtml = `
       <div class="mb-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
         <div><span class="text-gray-500">Waktu:</span> ${when}</div>
         <div><span class="text-gray-500">Aksi:</span> ${h.action}</div>
+        <div><span class="text-gray-500">Edited By:</span> ${h.edited_by ? h.edited_by.replace(/</g,'&lt;') : '-'}</div>
         <div class="md:col-span-2"><span class="text-gray-500">Catatan:</span> ${h.note ? h.note.replace(/</g,'&lt;') : '-'}</div>
       </div>
     `;
@@ -752,11 +715,11 @@ const changes = parseChanges(h); // <-- tambahkan ini
     openModal();
   }
 
-  // events
+  // ===== Init & Events =====
   document.addEventListener('DOMContentLoaded', () => {
-    buildFieldOptions();
-    buildValueOptions('');
+    initCharts();
 
+    // Age bucket
     const ageSelect = document.getElementById('ageSelect');
     if (ageSelect) {
       ageSelect.addEventListener('change', () => {
@@ -765,6 +728,7 @@ const changes = parseChanges(h); // <-- tambahkan ini
       });
     }
 
+    // Upgrade filters
     document.getElementById('assetType').addEventListener('change', () => {
       assetType = document.getElementById('assetType').value;
       pageUp = 1;
@@ -772,15 +736,12 @@ const changes = parseChanges(h); // <-- tambahkan ini
       buildValueOptions('');
       applyDropdownFilter();
     });
-
     document.getElementById('filterField').addEventListener('change', () => {
       filterField = document.getElementById('filterField').value;
       pageUp = 1;
       buildValueOptions('');
     });
-
     document.getElementById('btnApplyFilter').addEventListener('click', applyDropdownFilter);
-
     document.getElementById('btnResetFilter').addEventListener('click', () => {
       document.getElementById('assetType').value = 'ALL';
       assetType = 'ALL';
@@ -800,20 +761,42 @@ const changes = parseChanges(h); // <-- tambahkan ini
       openDetailModal(tr.dataset.type, tr.dataset.id);
     });
 
-    // Delegasi klik baris histori → modal diff
+    // Filter type history
+    const sel = document.getElementById('hisType');
+    if (sel) sel.addEventListener('change', () => applyHistoryFilter(true));
+
+    // Klik baris history → modal diff (pakai list yang sudah difilter & dipaginasi)
     document.getElementById('historyBody').addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-idx]');
-      if (!tr || !lastMetrics || !Array.isArray(lastMetrics.history)) return;
+      if (!tr) return;
       const idx = parseInt(tr.dataset.idx, 10);
-      const h = lastMetrics.history[idx];
-      if (!h) return;
-      openHistoryModal(h);
+      const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
+      const item = historyFiltered[start + (idx - start)];
+      if (!item) return;
+      openHistoryModal(item);
     });
+
+    // First load + refresh berkala
+    fetchMetrics();
+    setInterval(fetchMetrics, 30000);
   });
 
-  // init
-  initCharts();
-  fetchMetrics();
-  setInterval(fetchMetrics, 30000);
+  async function fetchMetrics() {
+    const url = "{{ route('dashboard.metrics') }}" + `?min_age=${minAge}`;
+    try {
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
+      const metrics = await res.json();
+      lastMetrics = metrics;
+
+      updateKpis(metrics);
+      updateBar(metrics);
+      updatePie(metrics);
+      updateUpgradeTable(metrics);
+      updateLokasiRawan(metrics);
+      updateHistory(metrics);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 </script>
 @endpush
