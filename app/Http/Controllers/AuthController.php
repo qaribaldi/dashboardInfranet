@@ -27,7 +27,9 @@ class AuthController extends Controller
             return redirect()->intended(route('dashboard'));
         }
 
-        return back()->withErrors(['email' => 'Email atau password salah'])->onlyInput('email');
+        return back()
+            ->withErrors(['email' => 'Email atau password salah'])
+            ->onlyInput('email');
     }
 
     public function showRegister()
@@ -48,7 +50,11 @@ class AuthController extends Controller
             'name'     => $data['name'],
             'email'    => $data['email'],
             'password' => Hash::make($data['password']),
+            'role'     => 'user', // <-- paksa user biasa
         ]);
+
+        // Jika pakai Spatie Permission, aktifkan ini:
+        // if (method_exists($user, 'assignRole')) $user->assignRole('user');
 
         Auth::login($user);
         $request->session()->regenerate();

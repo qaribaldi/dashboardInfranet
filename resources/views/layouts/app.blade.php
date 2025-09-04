@@ -27,10 +27,25 @@
                 </svg>
               </button>
             </x-slot>
+
             <x-slot name="content">
+              {{-- === MENU ADMIN KHUSUS: MANAJEMEN USER === --}}
+              @if(optional(Auth::user())->role === 'admin')
+                @if (Route::has('admin.users.index'))
+                  <x-dropdown-link href="{{ route('admin.users.index') }}">
+                    {{ __('Manajemen User') }}
+                  </x-dropdown-link>
+                @else
+                  {{-- Route belum dibuat; aman-aman saja, tidak ditampilkan linknya --}}
+                @endif
+                <div class="border-t my-1"></div>
+              @endif
+
+              {{-- === LOGOUT === --}}
               <form method="POST" action="{{ route('logout') }}">
                 @csrf
-                <x-dropdown-link href="{{ route('logout') }}" onclick="event.preventDefault(); this.closest('form').submit();">
+                <x-dropdown-link href="{{ route('logout') }}"
+                  onclick="event.preventDefault(); this.closest('form').submit();">
                   {{ __('Log Out') }}
                 </x-dropdown-link>
               </form>
@@ -39,124 +54,140 @@
         </header>
 
         {{-- Content --}}
-    <main class="flex-1 p-6">
-        @if (session('success'))
-            <div class="mb-4 rounded-lg border border-green-200 bg-green-50 text-green-800 px-4 py-3">
-                {{ session('success') }}
+       <main class="flex-1 p-6">
+  @once
+    @if (session('success'))
+      <div class="mb-4 rounded-lg border border-green-200 bg-green-50 text-green-800 px-4 py-3">
+        {{ session('success') }}
+      </div>
+    @endif
+
+    @if (session('error'))
+      <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
+        {{ session('error') }}
+      </div>
+    @endif
+
+    @if ($errors->any())
+      <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
+        <ul class="list-disc pl-5 space-y-1">
+          @foreach ($errors->all() as $e)
+            <li>{{ $e }}</li>
+          @endforeach
+        </ul>
+      </div>
+    @endif
+  @endonce
+
+  @yield('content')
+</main>
+
+
+        {{-- Modal Global --}}
+        <div id="modalOverlay" class="fixed inset-0 z-50 hidden">
+          {{-- backdrop --}}
+          <div id="modalBackdrop" class="absolute inset-0 bg-black/40"></div>
+
+          {{-- modal card --}}
+          <div class="relative mx-auto my-8 w-[95%] max-w-4xl rounded-2xl bg-white shadow-xl border border-gray-200
+                      max-h-[85vh] overflow-hidden">
+            <div class="flex items-center justify-between border-b px-4 md:px-6 py-3">
+              <h3 id="modalTitle" class="text-lg font-semibold">Detail</h3>
+              <button type="button" class="rounded-lg border px-2.5 py-1.5 hover:bg-gray-50" onclick="closeModal()">
+                &times; <span class="sr-only">Close</span>
+              </button>
             </div>
-        @endif
-        @yield('content')
-    </main>
+            <div id="modalBody" class="p-4 md:p-6 overflow-y-auto max-h-[70vh]">
+              {{-- konten detail akan dimuat di sini --}}
+            </div>
+            <div class="border-t px-4 md:px-6 py-3 flex justify-end">
+              <button class="rounded-lg border px-4 py-2 hover:bg-gray-50" onclick="closeModal()">Tutup</button>
+            </div>
+          </div>
+        </div>
 
-{{-- Modal Global --}}
-<div id="modalOverlay" class="fixed inset-0 z-50 hidden">
-  {{-- backdrop --}}
-  <div id="modalBackdrop" class="absolute inset-0 bg-black/40"></div>
+        <script>
+          const modalOverlay = document.getElementById('modalOverlay');
+          const modalBackdrop = document.getElementById('modalBackdrop');
+          const modalBody = document.getElementById('modalBody');
+          const modalTitle = document.getElementById('modalTitle');
 
-  {{-- modal card --}}
-  <div class="relative mx-auto my-8 w-[95%] max-w-4xl rounded-2xl bg-white shadow-xl border border-gray-200
-              max-h-[85vh] overflow-hidden">
-    <div class="flex items-center justify-between border-b px-4 md:px-6 py-3">
-      <h3 id="modalTitle" class="text-lg font-semibold">Detail</h3>
-      <button type="button" class="rounded-lg border px-2.5 py-1.5 hover:bg-gray-50" onclick="closeModal()">
-        &times; <span class="sr-only">Close</span>
-      </button>
+          let lastFocusedEl = null;
+
+          function showLoading() {
+            modalBody.innerHTML = `
+              <div class="flex items-center gap-3 text-gray-500">
+                <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                Memuat...
+              </div>`;
+          }
+
+          async function openModal(url, title = 'Detail') {
+            lastFocusedEl = document.activeElement;
+            document.body.style.overflow = 'hidden';
+
+            modalTitle.textContent = title;
+            showLoading();
+            modalOverlay.classList.remove('hidden');
+
+            try {
+              const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+              const html = await res.text();
+              modalBody.innerHTML = html;
+            } catch (e) {
+              modalBody.innerHTML = '<div class="text-red-600">Gagal memuat detail.</div>';
+            }
+
+            const closeBtn = modalOverlay.querySelector('button[onclick="closeModal()"]');
+            closeBtn && closeBtn.focus();
+          }
+
+          function closeModal() {
+            modalOverlay.classList.add('hidden');
+            modalBody.innerHTML = '';
+            document.body.style.overflow = '';
+            if (lastFocusedEl) lastFocusedEl.focus();
+          }
+
+          modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay || e.target === modalBackdrop) {
+              closeModal();
+            }
+          });
+
+          window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) {
+              closeModal();
+            }
+          });
+
+          document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab' || modalOverlay.classList.contains('hidden')) return;
+
+            const focusables = modalOverlay.querySelectorAll('a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (!focusables.length) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+
+            if (e.shiftKey) {
+              if (document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+              }
+            } else {
+              if (document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+              }
+            }
+          });
+        </script>
+
+        @stack('body-end')
+      </div>
     </div>
-    <div id="modalBody" class="p-4 md:p-6 overflow-y-auto max-h-[70vh]">
-      {{-- konten detail akan dimuat di sini --}}
-    </div>
-    <div class="border-t px-4 md:px-6 py-3 flex justify-end">
-      <button class="rounded-lg border px-4 py-2 hover:bg-gray-50" onclick="closeModal()">Tutup</button>
-    </div>
-  </div>
-</div>
-
-<script>
-  const modalOverlay = document.getElementById('modalOverlay');
-  const modalBackdrop = document.getElementById('modalBackdrop');
-  const modalBody = document.getElementById('modalBody');
-  const modalTitle = document.getElementById('modalTitle');
-
-  let lastFocusedEl = null;
-
-  function showLoading() {
-    modalBody.innerHTML = `
-      <div class="flex items-center gap-3 text-gray-500">
-        <svg class="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-        </svg>
-        Memuat...
-      </div>`;
-  }
-
-  async function openModal(url, title = 'Detail') {
-    // simpan fokus terakhir & kunci scroll body
-    lastFocusedEl = document.activeElement;
-    document.body.style.overflow = 'hidden';
-
-    modalTitle.textContent = title;
-    showLoading();
-    modalOverlay.classList.remove('hidden');
-
-    try {
-      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const html = await res.text();
-      modalBody.innerHTML = html;
-    } catch (e) {
-      modalBody.innerHTML = '<div class="text-red-600">Gagal memuat detail.</div>';
-    }
-
-    // fokus ke tombol tutup untuk aksesibilitas
-    const closeBtn = modalOverlay.querySelector('button[onclick="closeModal()"]');
-    closeBtn && closeBtn.focus();
-  }
-
-  function closeModal() {
-    modalOverlay.classList.add('hidden');
-    modalBody.innerHTML = '';
-    document.body.style.overflow = ''; // pulihkan scroll
-    // kembalikan fokus
-    if (lastFocusedEl) lastFocusedEl.focus();
-  }
-
-  // klik di luar card → close
-  modalOverlay.addEventListener('click', (e) => {
-    if (e.target === modalOverlay || e.target === modalBackdrop) {
-      closeModal();
-    }
-  });
-
-  // Esc → close
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !modalOverlay.classList.contains('hidden')) {
-      closeModal();
-    }
-  });
-
-  // focus trap sederhana di dalam modal
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab' || modalOverlay.classList.contains('hidden')) return;
-
-    const focusables = modalOverlay.querySelectorAll('a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (!focusables.length) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-
-    if (e.shiftKey) {
-      if (document.activeElement === first) {
-        e.preventDefault();
-        last.focus();
-      }
-    } else {
-      if (document.activeElement === last) {
-        e.preventDefault();
-        first.focus();
-      }
-    }
-  });
-</script>
-
-@stack('body-end')
-</body>
+  </body>
 </html>

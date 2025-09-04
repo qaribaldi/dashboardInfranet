@@ -6,24 +6,23 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::create('site_infos', function (Blueprint $table) {
-            $table->id();
-            $table->longText('content')->nullable();     // isi konten landing
-            $table->unsignedBigInteger('updated_by')->nullable(); // id user yang update
-            $table->timestamps(); // created_at & updated_at
-        });
+        if (!Schema::hasTable('site_infos')) {
+            Schema::create('site_infos', function (Blueprint $table) {
+                $table->id();
+                $table->longText('content')->nullable();
+                $table->unsignedBigInteger('updated_by')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('site_infos');
+        // Hanya drop kalau ada
+        if (Schema::hasTable('site_infos')) {
+            Schema::dropIfExists('site_infos');
+        }
     }
 };

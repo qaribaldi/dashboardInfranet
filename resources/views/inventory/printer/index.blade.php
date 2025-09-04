@@ -26,58 +26,50 @@
         @endif
       </form>
 
-      {{-- Tombol-tombol (admin) --}}
-      @auth
-        @if(auth()->user()->role === 'admin')
-          {{-- TRIGGER modal +Kolom --}}
-          <button type="button" id="btnAddCol"
-                  class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
-            Kelola Kolom
-          </button>
+      {{-- Tombol-tombol sesuai izin (khusus printer) --}}
+      @can('inventory.printer.columns')
+        <button type="button" id="btnAddCol"
+                class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
+          Kelola Kolom
+        </button>
+      @endcan
 
-          {{-- + Tambah --}}
-          <a href="{{ route('inventory.printer.create') }}"
-             class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
-            + Tambah
-          </a>
+      @can('inventory.printer.create')
+        <a href="{{ route('inventory.printer.create') }}"
+           class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
+          + Tambah
+        </a>
+      @endcan
 
-          {{-- Import CSV --}}
-          <a href="{{ route('inventory.printer.importForm') }}"
-             class="inline-flex items-center rounded-lg border px-3 py-2 text-sm hover:bg-gray-50">
-            Import CSV
-          </a>
-        @endif
-      @endauth
+      @can('inventory.printer.import')
+        <a href="{{ route('inventory.printer.importForm') }}"
+           class="inline-flex items-center rounded-lg border px-3 py-2 text-sm hover:bg-gray-50">
+          Import CSV
+        </a>
+      @endcan
     </div>
   </div>
 
-  {{-- ====== MODAL KELOLA KOLOM (TAB: Tambah/Rename/Hapus) ====== --}}
-@auth
-  @if(auth()->user()->role === 'admin')
+  {{-- ====== MODAL KELOLA KOLOM (khusus printer) ====== --}}
+  @can('inventory.printer.columns')
     <div id="addColModal" class="fixed inset-0 hidden items-center justify-center z-[70]">
       <div id="addColBackdrop" class="absolute inset-0 bg-black/40"></div>
 
       @php
-        // ========= KONFIG: SESUAIKAN UNTUK HALAMAN INI =========
-        // Halaman ini: PRINTER
+        // Konfigurasi untuk tabel PRINTER
         $table = 'asset_printer';
-        // Kolom standar yang TIDAK boleh di-rename/drop
+        // Kolom standar yang tidak boleh di-rename/drop
         $std = [
           'id_printer','unit_kerja','user','ruang',
           'jenis_printer','merk','tipe','status_warna',
           'kondisi','tahun_pembelian',
-          // kolom yang memang disembunyikan tapi standar tabel
           'jabatan','scanner','tinta','keterangan_tambahan',
         ];
         $protected = array_merge($std, ['created_at','updated_at']);
 
-        // Ambil kolom nyata dari DB, sisakan hanya yang boleh dikelola (dinamis)
         $allCols = \Illuminate\Support\Facades\Schema::getColumnListing($table);
         $editableCols = array_values(array_diff($allCols, $protected));
-        // helper label rapi
         $lbl = fn($s) => ucwords(str_replace('_',' ', $s));
-
-        // ROUTE untuk aksi
         $colRoutes = [
           'add'    => route('inventory.printer.columns.add'),
           'rename' => route('inventory.printer.columns.rename'),
@@ -100,15 +92,15 @@
         </div>
 
         <div class="p-4 space-y-5">
-          {{-- TAB: TAMBAH --}}
+          {{-- Add --}}
           <form id="tabAdd" class="tabPanel" method="POST" action="{{ $colRoutes['add'] }}">
             @csrf
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium mb-1">Nama Kolom Baru</label>
                 <input name="name" type="text" required pattern="[A-Za-z][A-Za-z0-9_]*"
-                       class="w-full rounded-lg border px-3 py-2" placeholder="mis: lokasi_rak">
-                <p class="text-xs text-gray-500 mt-1">Huruf/angka/underscore, tidak boleh diawali angka.</p>
+                      class="w-full rounded-lg border px-3 py-2" placeholder="mis: lokasi_rak">
+                <p class="text-xs text-gray-500 mt-1">Huruf/angka/underscore, tidak diawali angka.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium mb-1">Tipe Data</label>
@@ -130,7 +122,7 @@
             </div>
           </form>
 
-          {{-- TAB: RENAME (pakai dropdown kolom dinamis) --}}
+          {{-- Rename --}}
           <form id="tabRename" class="tabPanel hidden" method="POST" action="{{ $colRoutes['rename'] }}">
             @csrf
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -147,8 +139,8 @@
               <div>
                 <label class="block text-sm font-medium mb-1">Nama Kolom Baru</label>
                 <input name="to" type="text" required pattern="[A-Za-z][A-Za-z0-9_]*"
-                       class="w-full rounded-lg border px-3 py-2" placeholder="mis: lokasi_penyimpanan"
-                       {{ empty($editableCols) ? 'disabled' : '' }}>
+                      class="w-full rounded-lg border px-3 py-2" placeholder="mis: lokasi_penyimpanan"
+                      {{ empty($editableCols) ? 'disabled' : '' }}>
               </div>
             </div>
             <p class="text-xs text-gray-500">Hanya kolom dinamis yang bisa diubah.</p>
@@ -159,7 +151,7 @@
             </div>
           </form>
 
-          {{-- TAB: DROP (pakai dropdown kolom dinamis) --}}
+          {{-- Drop --}}
           <form id="tabDrop" class="tabPanel hidden" method="POST" action="{{ $colRoutes['drop'] }}"
                 onsubmit="return confirm('Hapus kolom ini? Data pada kolom tersebut akan hilang.')">
             @csrf @method('DELETE')
@@ -191,15 +183,14 @@
         const closeBtn = document.getElementById('addColClose');
         const backdrop = document.getElementById('addColBackdrop');
 
-        function open(){ modal.classList.remove('hidden'); modal.classList.add('flex'); document.body.style.overflow='hidden'; }
-        function close(){ modal.classList.add('hidden'); modal.classList.remove('flex'); document.body.style.overflow=''; }
+        function open(){ modal?.classList.remove('hidden'); modal?.classList.add('flex'); document.body.style.overflow='hidden'; }
+        function close(){ modal?.classList.add('hidden'); modal?.classList.remove('flex'); document.body.style.overflow=''; }
 
         openBtn?.addEventListener('click', open);
         closeBtn?.addEventListener('click', close);
         backdrop?.addEventListener('click', close);
         document.addEventListener('keydown', e => { if(e.key==='Escape') close(); });
 
-        // Tabs
         const tabs = document.querySelectorAll('.tabBtn');
         const panels = document.querySelectorAll('.tabPanel');
         tabs.forEach(btn => btn.addEventListener('click', (ev) => {
@@ -211,9 +202,7 @@
         }));
       })();
     </script>
-  @endif
-@endauth
-
+  @endcan
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
     @php
@@ -244,19 +233,21 @@
               <a href="javascript:void(0)"
                  onclick="openModal('{{ route('inventory.printer.show',$row->id_printer) }}','Detail Printer - {{ $row->id_printer }}')"
                  class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Detail</a>
-              @auth
-                @if(auth()->user()->role === 'admin')
-                  <a href="{{ route('inventory.printer.edit',$row->id_printer) }}"
-                     class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
-                  <form action="{{ route('inventory.printer.destroy',$row->id_printer) }}" method="POST" class="inline"
-                        onsubmit="return confirm('Hapus data ini?')">
-                    @csrf @method('DELETE')
-                    <button class="inline-flex items-center rounded border border-red-300 text-red-700 px-3 py-1.5 hover:bg-red-50">
-                      Hapus
-                    </button>
-                  </form>
-                @endif
-              @endauth
+
+              @can('inventory.printer.edit')
+                <a href="{{ route('inventory.printer.edit',$row->id_printer) }}"
+                   class="mr-2 inline-flex items-center rounded border px-3 py-1.5 hover:bg-gray-50">Edit</a>
+              @endcan
+
+              @can('inventory.printer.delete')
+                <form action="{{ route('inventory.printer.destroy',$row->id_printer) }}" method="POST" class="inline"
+                      onsubmit="return confirm('Hapus data ini?')">
+                  @csrf @method('DELETE')
+                  <button class="inline-flex items-center rounded border border-red-300 text-red-700 px-3 py-1.5 hover:bg-red-50">
+                    Hapus
+                  </button>
+                </form>
+              @endcan
             </td>
           </tr>
         @empty
