@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\InventoryHardware;
 use App\Models\AssetHistory;
+use App\Models\AssetPc;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
@@ -59,24 +60,32 @@ private const TYPE_MAP = [
     {
         $added = [];
         foreach ($defs as $d) {
-            $col = $this->normalize($d['name'] ?? '');
-            $type = $d['type'] ?? 'string';
-            $nullable = (bool)($d['nullable'] ?? true);
+        $col      = $this->normalize($d['name'] ?? '');
+        $type     = $d['type'] ?? 'string';
+        $nullable = (bool)($d['nullable'] ?? true);
 
-            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-            if (in_array($col, $this->std, true)) continue;
-            if (Schema::hasColumn($this->table, $col)) continue;
+        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
+        if (Schema::hasColumn($this->table, $col)) continue;
 
-            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-                $method = self::TYPE_MAP[$type];
-                $colDef = $table->{$method}($col);
-                if ($method === 'string') $colDef->nullable();
-                if ($nullable && method_exists($colDef, 'nullable')) $colDef->nullable();
-            });
+        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+            $method = self::TYPE_MAP[$type];
+            $colDef = $table->{$method}($col);
 
-            $added[] = $col;
-        }
-        return $added;
+            // 🔑 KUNCI: date/datetime wajib nullable agar aman untuk baris lama
+            if (in_array($type, ['date','datetime'], true)) {
+                $colDef->nullable();
+            } else {
+                // kalau tipe lain, ikuti flag $nullable (string tidak perlu dipaksa khusus)
+                if ($nullable && method_exists($colDef, 'nullable')) {
+                    $colDef->nullable();
+                }
+            }
+        });
+
+        $added[] = $col;
+    }
+    return $added;
     }
 
     /** Action: + Kolom (admin) */
@@ -198,6 +207,36 @@ public function dropColumn(Request $request)
     return view('inventory.hardware.index', compact('items'));
 }
 
+    private function columnKinds(string $table): array
+{
+    $cols = \Schema::getColumnListing($table);
+    $dateCols = [];
+    $datetimeCols = [];
+
+    try {
+        $sm = \DB::connection()->getDoctrineSchemaManager();
+        $dt = $sm->listTableDetails($table);
+        foreach ($cols as $c) {
+            $t = $dt->getColumn($c)->getType()->getName(); // ex: 'string','date','datetime','datetimetz'
+            if ($t === 'date') $dateCols[] = $c;
+            if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        }
+    } catch (\Throwable $e) {
+        // fallback sederhana kalau doctrine/dbal belum terpasang
+        foreach ($cols as $c) {
+            if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
+            if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+        }
+    }
+
+    // jangan kirim timestamps
+    $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
+    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+    return compact('dateCols','datetimeCols');
+}
+
+
     // =============== FORM ===============
     public function create()
     {
@@ -209,13 +248,19 @@ public function dropColumn(Request $request)
         $fields[$col] = ucwords(str_replace('_',' ',$col));
     }
 
+    $statusOptions = config('inventory.status_options');
+    $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc'); 
+    $kinds = $this->columnKinds($this->table);
+
     return view('inventory.hardware.form', [
         'mode'          => 'create',
         'fields'        => $fields,
         'data'          => new InventoryHardware(),
         'jenisList'     => self::JENIS,
         'storageTypes'  => self::STORAGE_TYPES,
-    ]);
+        'statusOptions' => $statusOptions,
+        'pcIds'         => $pcIds,
+    ]+ $kinds);
     }
 
     public function store(Request $req)
@@ -226,9 +271,9 @@ public function dropColumn(Request $request)
         'tanggal_pembelian'  => 'nullable|date',
         'vendor'             => 'nullable|string',
         'jumlah_stock'       => 'nullable|integer',
-        'status'             => 'nullable|string|in:available,in_use,broken',
+        'status'             => 'nullable|string|in:In use,In store,Service',
         'tanggal_digunakan'  => 'nullable|date',
-        'id_pc'              => 'nullable|string',
+        'id_pc'              => 'nullable|string|exists:asset_pc,id_pc', 
         'storage_type'       => 'nullable|in:ssd,hdd', // valid tapi akan di-nilkan jika bukan storage
     ]);
 
@@ -250,13 +295,19 @@ public function dropColumn(Request $request)
         $fields[$col] = ucwords(str_replace('_',' ',$col));
     }
 
+    $statusOptions = config('inventory.status_options');
+    $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc');
+    $kinds = $this->columnKinds($this->table);
+
     return view('inventory.hardware.form', [
         'mode'          => 'edit',
         'fields'        => $fields,
         'data'          => $hardware,
         'jenisList'     => self::JENIS,
         'storageTypes'  => self::STORAGE_TYPES,
-    ]);
+        'statusOptions' => $statusOptions,
+        'pcIds'         => $pcIds,
+    ]+ $kinds);
     }
 
     public function update(Request $req, InventoryHardware $hardware)
@@ -267,9 +318,9 @@ public function dropColumn(Request $request)
         'tanggal_pembelian'  => 'nullable|date',
         'vendor'             => 'nullable|string',
         'jumlah_stock'       => 'nullable|integer',
-        'status'             => 'nullable|string|in:available,in_use,broken',
+        'status'             => 'nullable|string|in:In use,In store,Service',
         'tanggal_digunakan'  => 'nullable|date',
-        'id_pc'              => 'nullable|string',
+        'id_pc'              => 'nullable|string|exists:asset_pc,id_pc', 
         'storage_type'       => 'nullable|in:ssd,hdd',
     ]);
 

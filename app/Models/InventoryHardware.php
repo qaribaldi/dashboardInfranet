@@ -15,8 +15,13 @@ class InventoryHardware extends Model
     protected $guarded = [];
     protected $fillable = [
   'id_hardware','jenis_hardware','tanggal_pembelian','vendor','jumlah_stock',
-  'status','tanggal_digunakan','id_pc','storage_type', // <— tambah ini
-  // kolom lain jika ada
-];
+  'status','tanggal_digunakan','id_pc','storage_type',
+  ];
+
+
+public function pc()
+    {
+        return $this->belongsTo(AssetPc::class, 'id_pc', 'id_pc');
+    }
 
 }

@@ -11,6 +11,8 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Carbon;
 
 
 class AssetPcController extends Controller
@@ -63,26 +65,73 @@ class AssetPcController extends Controller
     private function ensureColumns(array $defs): array
     {
         // $defs: [ ['name'=>'umur_baterai','type'=>'integer','nullable'=>true], ... ]
-        $added = [];
-        foreach ($defs as $d) {
-            $col      = $this->normalize($d['name'] ?? '');
-            $type     = $d['type'] ?? 'string';
-            $nullable = (bool)($d['nullable'] ?? true);
+       $added = [];
+    foreach ($defs as $d) {
+        $col      = $this->normalize($d['name'] ?? '');
+        $type     = $d['type'] ?? 'string';
+        $nullable = (bool)($d['nullable'] ?? true);
 
-            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-            if (in_array($col, $this->protectedColumns(), true)) continue; // jangan tumpang tindih kolom standar
-            if (Schema::hasColumn($this->table, $col)) continue;
+        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
+        if (Schema::hasColumn($this->table, $col)) continue;
 
-            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-                $method = self::TYPE_MAP[$type];
-                $colDef = $table->{$method}($col);
-                if ($nullable && method_exists($colDef, 'nullable')) $colDef->nullable();
-            });
+        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+            $method = self::TYPE_MAP[$type];
+            $colDef = $table->{$method}($col);
 
-            $added[] = $col;
-        }
-        return $added;
+            // 🔑 KUNCI: date/datetime wajib nullable agar aman untuk baris lama
+            if (in_array($type, ['date','datetime'], true)) {
+                $colDef->nullable();
+            } else {
+                // kalau tipe lain, ikuti flag $nullable (string tidak perlu dipaksa khusus)
+                if ($nullable && method_exists($colDef, 'nullable')) {
+                    $colDef->nullable();
+                }
+            }
+        });
+
+        $added[] = $col;
     }
+    return $added;
+    }
+
+    private function columnKinds(string $table): array
+{
+    // default fallback: tebak dari nama kolom (kalau tidak ada doctrine/dbal)
+    $guessIsDate = function($name) {
+        return preg_match('/(^tanggal_|_date$)/', $name);
+    };
+    $guessIsDatetime = function($name) {
+        return preg_match('/(_at$|^waktu_|_datetime$)/', $name);
+    };
+
+    $cols = \Schema::getColumnListing($table);
+    $dateCols = [];
+    $datetimeCols = [];
+
+    // coba pakai doctrine/dbal (lebih akurat)
+    try {
+        $sm = \DB::connection()->getDoctrineSchemaManager();
+        $doctrineTable = $sm->listTableDetails($table);
+        foreach ($cols as $c) {
+            $type = $doctrineTable->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
+            if ($type === 'date') $dateCols[] = $c;
+            if (in_array($type, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        }
+    } catch (\Throwable $e) {
+        // fallback: tebak dari nama kolom
+        foreach ($cols as $c) {
+            if ($guessIsDate($c))     $dateCols[] = $c;
+            if ($guessIsDatetime($c)) $datetimeCols[] = $c;
+        }
+    }
+
+    // jangan kirim created_at/updated_at ke view
+    $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
+    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+    return compact('dateCols','datetimeCols');
+}
 
     /** ========== MANAGE KOLOM DINAMIS ========== */
 
@@ -249,11 +298,16 @@ class AssetPcController extends Controller
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
+        $statusOptions = config('inventory.status_options');
+
+        $kinds = $this->columnKinds($this->table); 
+
         return view('inventory.pc.form', [
             'mode'  => 'create',
             'fields'=> $fields,
-            'data'  => new AssetPc()
-        ]);
+            'data'  => new AssetPc(),
+            'statusOptions' => $statusOptions,
+        ] + $kinds);
     }
 
     public function store(Request $request)
@@ -265,6 +319,7 @@ class AssetPcController extends Controller
         $request->validate([
             $this->pk           => 'required|string|unique:'.$this->table.','.$this->pk,
             'tahun_pembelian'   => 'nullable|integer',
+            'status'            => 'nullable|in:In use,In store,Service',
         ]);
 
         $input = $request->only($writable);
@@ -283,11 +338,15 @@ class AssetPcController extends Controller
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
+        $statusOptions = config('inventory.status_options');
+        $kinds = $this->columnKinds($this->table);
+
         return view('inventory.pc.form', [
             'mode'  => 'edit',
             'fields'=> $fields,
-            'data'  => $pc
-        ]);
+            'data'  => $pc,
+            'statusOptions' => $statusOptions,
+        ]+ $kinds);
     }
 
     public function update(Request $request, AssetPc $pc)
@@ -299,6 +358,7 @@ class AssetPcController extends Controller
         $request->validate([
             $this->pk         => 'required|string|unique:'.$this->table.','.$this->pk.','.$pc->{$this->pk}.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
+            'status'            => 'nullable|in:In use,In store,Service',
         ]);
 
         $input  = $request->only($writable);

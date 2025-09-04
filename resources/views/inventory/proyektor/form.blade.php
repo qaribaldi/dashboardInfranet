@@ -8,8 +8,25 @@
     @if($mode === 'edit') @method('PUT') @endif
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      @php
-  $statusOps = ['available' => 'Available', 'in_use' => 'In Use', 'broken' => 'Broken'];
+@php
+  $dateCols     = $dateCols     ?? [];
+  $datetimeCols = $datetimeCols ?? [];
+
+  $statusOps = $statusOptions ?? ['In use','In store','Service'];
+  $currentStatus = old('status', $data->status ?? '');
+  $mapOldToNew = ['available'=>'In store','in_use'=>'In use','broken'=>'Service'];
+  if (isset($mapOldToNew[$currentStatus])) $currentStatus = $mapOldToNew[$currentStatus];
+
+  $fmtVal = function($name, $value) use ($dateCols, $datetimeCols) {
+      $v = old($name, $value);
+      if ($v === null || $v === '') return '';
+      if (in_array($name, $dateCols, true)) return substr((string)$v, 0, 10);
+      if (in_array($name, $datetimeCols, true)) {
+          $s = substr((string)$v, 0, 16);
+          return str_replace(' ', 'T', $s);
+      }
+      return (string)$v;
+  };
 @endphp
 
 @foreach($fields as $name => $label)
@@ -17,9 +34,9 @@
     <div>
       <label class="block text-sm font-medium mb-1" for="status">Status</label>
       <select id="status" name="status" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-        @foreach($statusOps as $val => $text)
-          <option value="{{ $val }}" {{ old('status', $data->status ?? 'in_use') === $val ? 'selected' : '' }}>
-            {{ $text }}
+        @foreach($statusOps as $opt)
+          <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>
+            {{ $opt }}
           </option>
         @endforeach
       </select>
@@ -28,19 +45,31 @@
   @else
     <div>
       <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
-      <input id="{{ $name }}" name="{{ $name }}" value="{{ old($name, $data->{$name}) }}"
-             class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+
+      @if(in_array($name, $dateCols, true))
+        <input type="date" id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @elseif(in_array($name, $datetimeCols, true))
+        <input type="datetime-local" id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @else
+        <input id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @endif
+
       @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
     </div>
   @endif
 @endforeach
-
     </div>
 
-     <div>
-  <label class="block text-sm font-medium mb-1" for="catatan_histori">Catatan Histori</label>
-  <textarea id="catatan_histori" name="catatan_histori" class="w-full rounded-lg border border-gray-300 px-3 py-2" rows="3" placeholder="Misal: Upgrade RAM dari 8GB ke 16GB, ganti SSD, perbaikan PSU, dll.">{{ old('catatan_histori') }}</textarea>
-</div>
+    <div>
+      <label class="block text-sm font-medium mb-1" for="catatan_histori">Catatan Histori</label>
+      <textarea id="catatan_histori" name="catatan_histori" class="w-full rounded-lg border border-gray-300 px-3 py-2" rows="3" placeholder="Misal: ganti lamp, servis panel, dll.">{{ old('catatan_histori') }}</textarea>
+    </div>
 
     <div class="flex items-center gap-3">
       <button class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">

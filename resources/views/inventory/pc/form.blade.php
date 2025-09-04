@@ -5,7 +5,6 @@
     {{ $mode === 'create' ? 'Tambah' : 'Edit' }} Aset PC
   </h2>
 
-  {{-- Action & method sesuai mode --}}
   <form
     action="{{ $mode === 'create'
         ? route('inventory.pc.store')
@@ -14,13 +13,36 @@
     class="space-y-5"
   >
     @csrf
-    @if($mode === 'edit')
-      @method('PUT')
-    @endif
+    @if($mode === 'edit') @method('PUT') @endif
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      @php
-  $statusOps = ['available' => 'Available', 'in_use' => 'In Use', 'broken' => 'Broken'];
+@php
+  // daftar kolom bertipe tanggal & datetime dari controller
+  $dateCols     = $dateCols     ?? [];
+  $datetimeCols = $datetimeCols ?? [];
+
+  // opsi status baru + mapping nilai lama -> baru
+  $statusOps = $statusOptions ?? ['In use','In store','Service'];
+  $currentStatus = old('status', $data->status ?? '');
+  $mapOldToNew = ['available'=>'In store','in_use'=>'In use','broken'=>'Service'];
+  if (isset($mapOldToNew[$currentStatus])) $currentStatus = $mapOldToNew[$currentStatus];
+
+  // helper kecil untuk format nilai input
+  $fmtVal = function($name, $value) use ($dateCols, $datetimeCols) {
+      $v = old($name, $value);
+      if ($v === null || $v === '') return '';
+      // jika date => YYYY-MM-DD
+      if (in_array($name, $dateCols, true)) {
+          // ambil 10 char awal (YYYY-MM-DD)
+          return substr((string)$v, 0, 10);
+      }
+      // jika datetime => YYYY-MM-DDTHH:MM
+      if (in_array($name, $datetimeCols, true)) {
+          $s = substr((string)$v, 0, 16);      // "YYYY-MM-DD HH:MM"
+          return str_replace(' ', 'T', $s);    // -> "YYYY-MM-DDTHH:MM"
+      }
+      return (string)$v;
+  };
 @endphp
 
 @foreach($fields as $name => $label)
@@ -28,9 +50,9 @@
     <div>
       <label class="block text-sm font-medium mb-1" for="status">Status</label>
       <select id="status" name="status" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-        @foreach($statusOps as $val => $text)
-          <option value="{{ $val }}" {{ old('status', $data->status ?? 'in_use') === $val ? 'selected' : '' }}>
-            {{ $text }}
+        @foreach($statusOps as $opt)
+          <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>
+            {{ $opt }}
           </option>
         @endforeach
       </select>
@@ -39,29 +61,38 @@
   @else
     <div>
       <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
-      <input id="{{ $name }}" name="{{ $name }}" value="{{ old($name, $data->{$name}) }}"
-             class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+
+      @if(in_array($name, $dateCols, true))
+        <input type="date" id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @elseif(in_array($name, $datetimeCols, true))
+        <input type="datetime-local" id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @else
+        <input id="{{ $name }}" name="{{ $name }}"
+               value="{{ $fmtVal($name, $data->{$name}) }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+      @endif
+
       @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
     </div>
   @endif
 @endforeach
-
     </div>
-    {{-- Catatan histori hanya muncul saat edit --}}
+
     @if($mode === 'edit')
       <div>
         <label class="block text-sm font-medium mb-1" for="catatan_histori">Catatan Histori</label>
-        <textarea id="catatan_histori" name="catatan_histori" 
-                  class="w-full rounded-lg border border-gray-300 px-3 py-2" 
-                  rows="3" 
-                  placeholder="Misal: Upgrade RAM dari 8GB ke 16GB, ganti SSD, perbaikan PSU, dll.">
-          {{ old('catatan_histori') }}
-        </textarea>
+        <textarea id="catatan_histori" name="catatan_histori"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  rows="3"
+                  placeholder="Misal: Upgrade RAM dari 8GB ke 16GB, ganti SSD, perbaikan PSU, dll.">{{ old('catatan_histori') }}</textarea>
       </div>
     @endif
 
     <hr class="my-6">
-
 
     <div class="flex items-center gap-3">
       <button class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">
@@ -70,5 +101,4 @@
       <a href="{{ route('inventory.pc.index') }}" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Batal</a>
     </div>
   </form>
-  
 @endsection

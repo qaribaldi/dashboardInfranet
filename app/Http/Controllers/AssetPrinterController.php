@@ -54,25 +54,33 @@ class AssetPrinterController extends Controller
     private function ensureColumns(array $defs): array
     {
         $added = [];
-        foreach ($defs as $d) {
-            $col = $this->normalize($d['name'] ?? '');
-            $type = $d['type'] ?? 'string';
-            $nullable = (bool)($d['nullable'] ?? true);
+    foreach ($defs as $d) {
+        $col      = $this->normalize($d['name'] ?? '');
+        $type     = $d['type'] ?? 'string';
+        $nullable = (bool)($d['nullable'] ?? true);
 
-            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-            if (in_array($col, $this->std, true)) continue; // jangan tumpang tindih kolom standar
-            if (Schema::hasColumn($this->table, $col)) continue;
+        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
+        if (Schema::hasColumn($this->table, $col)) continue;
 
-            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-                $method = self::TYPE_MAP[$type];
-                $colDef = $table->{$method}($col);
-                if ($method === 'string') $colDef->nullable();
-                if ($nullable && method_exists($colDef, 'nullable')) $colDef->nullable();
-            });
+        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+            $method = self::TYPE_MAP[$type];
+            $colDef = $table->{$method}($col);
 
-            $added[] = $col;
-        }
-        return $added;
+            // 🔑 KUNCI: date/datetime wajib nullable agar aman untuk baris lama
+            if (in_array($type, ['date','datetime'], true)) {
+                $colDef->nullable();
+            } else {
+                // kalau tipe lain, ikuti flag $nullable (string tidak perlu dipaksa khusus)
+                if ($nullable && method_exists($colDef, 'nullable')) {
+                    $colDef->nullable();
+                }
+            }
+        });
+
+        $added[] = $col;
+    }
+    return $added;
     }
 
     public function addColumn(Request $request)
@@ -163,6 +171,36 @@ public function dropColumn(Request $request)
         return array_values(array_diff($all, $this->std));
     }
 
+    private function columnKinds(string $table): array
+{
+    $cols = \Schema::getColumnListing($table);
+    $dateCols = [];
+    $datetimeCols = [];
+
+    try {
+        $sm = \DB::connection()->getDoctrineSchemaManager();
+        $dt = $sm->listTableDetails($table);
+        foreach ($cols as $c) {
+            $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
+            if ($t === 'date') $dateCols[] = $c;
+            if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        }
+    } catch (\Throwable $e) {
+        // fallback: tebak dari nama kolom kalau doctrine/dbal belum dipasang
+        foreach ($cols as $c) {
+            if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
+            if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+        }
+    }
+
+    // jangan kirim timestamps
+    $dateCols = array_values(array_diff($dateCols, ['created_at','updated_at']));
+    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+    return compact('dateCols','datetimeCols');
+}
+
+
     // ================== LIST ==================
     public function index(Request $request)
     {
@@ -240,11 +278,15 @@ public function dropColumn(Request $request)
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
+        $statusOptions = config('inventory.status_options');
+        $kinds = $this->columnKinds($this->table); 
+
         return view('inventory.printer.form', [
             'mode'=>'create',
             'fields'=>$fields,
-            'data'=>new AssetPrinter()
-        ]);
+            'data'=>new AssetPrinter(),
+            'statusOptions' => $statusOptions,
+        ]+ $kinds);
     }
 
     public function store(Request $request)
@@ -256,6 +298,7 @@ public function dropColumn(Request $request)
         $request->validate([
             $this->pk => 'required|string|unique:'.$this->table.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
+            'status'          => 'nullable|in:In use,In store,Service',
         ]);
 
         $input = $request->only($writable);
@@ -274,11 +317,15 @@ public function dropColumn(Request $request)
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
 
+        $statusOptions = config('inventory.status_options');
+        $kinds = $this->columnKinds($this->table); 
+
         return view('inventory.printer.form', [
             'mode'=>'edit',
             'fields'=>$fields,
-            'data'=>$printer
-        ]);
+            'data'=>$printer,
+            'statusOptions' => $statusOptions,
+        ]+ $kinds);
     }
 
     public function update(Request $request, AssetPrinter $printer)
@@ -290,6 +337,7 @@ public function dropColumn(Request $request)
         $request->validate([
             $this->pk => 'required|string|unique:'.$this->table.','.$this->pk.','.$printer->{$this->pk}.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
+            'status'          => 'nullable|in:In use,In store,Service',
         ]);
 
         $input  = $request->only($writable);

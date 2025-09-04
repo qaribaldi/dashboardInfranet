@@ -66,10 +66,14 @@
 
       {{-- Tanggal Pembelian --}}
       @if(array_key_exists('tanggal_pembelian',$fields))
+      @php
+        $tpRaw = old('tanggal_pembelian', $data->tanggal_pembelian ?? null);
+        $tpVal = $tpRaw ? \Illuminate\Support\Carbon::parse($tpRaw)->format('Y-m-d') : '';
+      @endphp
       <div>
         <label class="block text-sm font-medium mb-1" for="tanggal_pembelian">Tanggal Pembelian</label>
         <input type="date" id="tanggal_pembelian" name="tanggal_pembelian"
-               value="{{ old('tanggal_pembelian', $data->tanggal_pembelian) }}"
+               value="{{ $tpVal }}"
                class="w-full rounded-lg border border-gray-300 px-3 py-2" />
         @error('tanggal_pembelian') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
@@ -86,49 +90,92 @@
       </div>
       @endif
 
-      {{-- Status --}}
+      {{-- Status (opsi baru) --}}
       @if(array_key_exists('status',$fields))
+      @php
+        $statusOps = $statusOptions ?? ['In use','In store','Service'];
+        $currentStatus = old('status', $data->status ?? '');
+        $mapOldToNew = ['available'=>'In store','in_use'=>'In use','broken'=>'Service'];
+        if (isset($mapOldToNew[$currentStatus])) $currentStatus = $mapOldToNew[$currentStatus];
+      @endphp
       <div>
         <label class="block text-sm font-medium mb-1" for="status">Status</label>
         <select id="status" name="status" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-          @php $statusOps = ['available'=>'Available','in_use'=>'In Use','broken'=>'Broken']; @endphp
-          @foreach($statusOps as $val=>$label)
-            <option value="{{ $val }}" {{ old('status', $data->status)===$val ? 'selected' : '' }}>{{ $label }}</option>
+          @foreach($statusOps as $opt)
+            <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
           @endforeach
         </select>
-        <p class="text-xs text-gray-500 mt-1">Jika <b>In Use</b>, isi Tanggal Digunakan &amp; ID PC.</p>
+        <p class="text-xs text-gray-500 mt-1">Jika <b>In use</b>, isi Tanggal Digunakan &amp; ID PC.</p>
         @error('status') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
       @endif
 
-      {{-- Tanggal Digunakan (muncul jika status = in_use) --}}
+      {{-- Tanggal Digunakan (muncul jika status = In use) --}}
       @if(array_key_exists('tanggal_digunakan',$fields))
-      <div id="field_tanggal_digunakan" class="{{ old('status', $data->status)==='in_use' ? '' : 'hidden' }}">
+      @php
+        $inUseNow = ($currentStatus === 'In use');
+        $tdRaw = old('tanggal_digunakan', $data->tanggal_digunakan ?? null);
+        $tdVal = $tdRaw ? \Illuminate\Support\Carbon::parse($tdRaw)->format('Y-m-d') : '';
+      @endphp
+      <div id="field_tanggal_digunakan" class="{{ $inUseNow ? '' : 'hidden' }}">
         <label class="block text-sm font-medium mb-1" for="tanggal_digunakan">Tanggal Digunakan</label>
         <input type="date" id="tanggal_digunakan" name="tanggal_digunakan"
-               value="{{ old('tanggal_digunakan', $data->tanggal_digunakan) }}"
-               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+               value="{{ $tdVal }}"
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" {{ $inUseNow ? '' : 'disabled' }} />
         @error('tanggal_digunakan') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
       @endif
 
-      {{-- ID PC (muncul jika status = in_use) --}}
+      {{-- ID PC (dropdown, muncul jika status = In use) --}}
       @if(array_key_exists('id_pc',$fields))
-      <div id="field_id_pc" class="{{ old('status', $data->status)==='in_use' ? '' : 'hidden' }}">
+      @php $inUseNow = ($currentStatus === 'In use'); @endphp
+      <div id="field_id_pc" class="{{ $inUseNow ? '' : 'hidden' }}">
         <label class="block text-sm font-medium mb-1" for="id_pc">ID PC</label>
-        <input id="id_pc" name="id_pc" value="{{ old('id_pc', $data->id_pc) }}"
-               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+        <select id="id_pc" name="id_pc" class="w-full rounded-lg border border-gray-300 px-3 py-2" {{ $inUseNow ? '' : 'disabled' }}>
+          <option value="">— pilih ID PC —</option>
+          @foreach(($pcIds ?? []) as $pid)
+            <option value="{{ $pid }}" @selected(old('id_pc', $data->id_pc ?? '') === $pid)>{{ $pid }}</option>
+          @endforeach
+        </select>
         @error('id_pc') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
       @endif
 
-      {{-- Kolom dinamis lain (jika ada) --}}
+      {{-- Kolom dinamis lain (auto: date / datetime / text) --}}
       @foreach($fields as $name => $label)
-        @continue(in_array($name, ['id_hardware','jenis_hardware','storage_type','vendor','tanggal_pembelian','jumlah_stock','status','tanggal_digunakan','id_pc']))
+        @continue(in_array($name, [
+          'id_hardware','jenis_hardware','storage_type','vendor',
+          'tanggal_pembelian','jumlah_stock','status','tanggal_digunakan','id_pc'
+        ]))
+
+        @php
+          $isDate = in_array($name, $dateCols ?? []);
+          $isDt   = in_array($name, $datetimeCols ?? []);
+          $raw    = old($name, $data->{$name} ?? null);
+
+          if ($isDate) {
+              $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d') : '';
+          } elseif ($isDt) {
+              $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d\TH:i') : '';
+          } else {
+              $val = $raw;
+          }
+        @endphp
+
         <div>
           <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
-          <input id="{{ $name }}" name="{{ $name }}" value="{{ old($name, $data->{$name}) }}"
-                 class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+
+          @if($isDate)
+            <input type="date" id="{{ $name }}" name="{{ $name }}"
+                   value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+          @elseif($isDt)
+            <input type="datetime-local" id="{{ $name }}" name="{{ $name }}"
+                   value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+          @else
+            <input id="{{ $name }}" name="{{ $name }}" value="{{ $val }}"
+                   class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+          @endif
+
           @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
         </div>
       @endforeach
@@ -171,12 +218,12 @@
 
     function onJenisChange() {
       const isStorage = (jenisEl?.value === 'storage');
-      setHidden(storageWrap, !isStorage, storageSelect, true); // required kalau storage
+      setHidden(storageWrap, !isStorage, storageSelect, true);
       if (!isStorage && storageSelect) storageSelect.value = '';
     }
 
     function onStatusChange() {
-      const inUse = (statusEl?.value === 'in_use');
+      const inUse = (statusEl?.value === 'In use');
       setHidden(usedDateWrap, !inUse, usedDateInput, true);
       setHidden(idPcWrap,     !inUse, idPcInput,     true);
       if (!inUse) {
@@ -185,7 +232,6 @@
       }
     }
 
-    // init saat halaman dibuka
     document.addEventListener('DOMContentLoaded', () => {
       onJenisChange();
       onStatusChange();
