@@ -44,10 +44,19 @@ Route::delete('/dashboard/clear-history', [DashboardController::class, 'clearHis
  * =========================
  * INVENTORY ROOT
  * =========================
+ * Arahkan ke modul pertama yang boleh dilihat user.
  */
-Route::get('/inventory', fn () => redirect()->route('inventory.pc.index'))
-    ->middleware('auth')
-    ->name('inventory');
+Route::get('/inventory', function () {
+    $u = auth()->user();
+
+    if ($u->can('inventory.pc.view'))        return redirect()->route('inventory.pc.index');
+    if ($u->can('inventory.printer.view'))   return redirect()->route('inventory.printer.index');
+    if ($u->can('inventory.proyektor.view')) return redirect()->route('inventory.proyektor.index');
+    if ($u->can('inventory.ac.view'))        return redirect()->route('inventory.ac.index');
+    if ($u->can('inventory.hardware.view'))  return redirect()->route('inventory.hardware.index');
+
+    abort(403, 'Anda tidak punya izin melihat inventory.');
+})->middleware('auth')->name('inventory');
 
 /**
  * ============================================================
@@ -200,17 +209,37 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
 
 /**
  * ============================================================
- * INVENTORY (READ-ONLY untuk semua user login) — BOTTOM
+ * INVENTORY (VIEW: index/show) — Dipagari permission *.view
  * ============================================================
- * (diletakkan SETELAH blok CRUD agar /pc/create tidak
- *  tertangkap oleh /pc/{pc})
+ * Gantikan blok "READ-ONLY untuk semua user login" menjadi
+ * definisi per-modul dengan middleware permission berikut.
  */
-Route::prefix('inventory')->middleware('auth')->name('inventory.')->group(function () {
-    Route::resource('pc',        AssetPcController::class)->only(['index','show']);
-    Route::resource('printer',   AssetPrinterController::class)->only(['index','show']);
-    Route::resource('proyektor', AssetProyektorController::class)->only(['index','show']);
-    Route::resource('ac',        AssetAcController::class)->only(['index','show']);
-    Route::resource('hardware',  InventoryHardwareController::class)->only(['index','show']);
+Route::prefix('inventory')->name('inventory.')->group(function () {
+
+    // PC
+    Route::middleware(['auth','permission:inventory.pc.view'])->group(function () {
+        Route::resource('pc', AssetPcController::class)->only(['index','show']);
+    });
+
+    // Printer
+    Route::middleware(['auth','permission:inventory.printer.view'])->group(function () {
+        Route::resource('printer', AssetPrinterController::class)->only(['index','show']);
+    });
+
+    // Proyektor
+    Route::middleware(['auth','permission:inventory.proyektor.view'])->group(function () {
+        Route::resource('proyektor', AssetProyektorController::class)->only(['index','show']);
+    });
+
+    // AC
+    Route::middleware(['auth','permission:inventory.ac.view'])->group(function () {
+        Route::resource('ac', AssetAcController::class)->only(['index','show']);
+    });
+
+    // Hardware
+    Route::middleware(['auth','permission:inventory.hardware.view'])->group(function () {
+        Route::resource('hardware', InventoryHardwareController::class)->only(['index','show']);
+    });
 });
 
 /**

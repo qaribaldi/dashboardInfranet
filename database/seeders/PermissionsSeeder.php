@@ -33,7 +33,7 @@ class PermissionsSeeder extends Seeder
             'inventory.hardware.import','inventory.hardware.export',
         ];
 
-        // Manajemen kolom per aset (pakai 1 kunci payung per aset; jika mau bisa dipecah add/rename/drop)
+        // Manajemen kolom per aset (bisa dipecah add/rename/drop kalau mau)
         $perEntityColumns = [
             'inventory.pc.columns',
             'inventory.printer.columns',
@@ -44,7 +44,8 @@ class PermissionsSeeder extends Seeder
 
         // Dashboard
         $dashboardPerms = [
-            'dashboard.view', 'dashboard.view.history', 'dashboard.view.lokasi-rawan', 'dashboard.view.kpi', 'dashboard.view.chart',	
+            'dashboard.view', 'dashboard.view.history', 'dashboard.view.lokasi-rawan',
+            'dashboard.view.kpi', 'dashboard.view.chart',
         ];
 
         foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms) as $name) {
@@ -54,17 +55,16 @@ class PermissionsSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin']);
         $user  = Role::firstOrCreate(['name' => 'user']);
 
-        // admin dapat semua
+        // Admin dapat semua
         $admin->syncPermissions(Permission::all());
 
-        // user default: hanya view inventory + semua view dashboard
+        // USER DEFAULT: tidak punya akses inventory sama sekali.
+        // Hanya boleh melihat dashboard basic (opsional: hapus 'dashboard.view' jika mau nol akses total).
         $userDefaultPerms = [
-    'inventory.pc.view','inventory.printer.view','inventory.proyektor.view',
-    'inventory.ac.view','inventory.hardware.view',
-    'dashboard.view',                    // hanya bisa buka halaman
-    // kalau mau default-nya lihat lokasi rawan, tambahkan ini:
-    // 'dashboard.view.lokasi-rawan',
-];
-$user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());
+            'dashboard.view',
+            // Kalau mau user baru juga bisa lihat lokasi rawan, tinggal tambahkan:
+            // 'dashboard.view.lokasi-rawan',
+        ];
+        $user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());
     }
 }
