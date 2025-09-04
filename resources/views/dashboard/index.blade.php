@@ -4,222 +4,237 @@
 
 @section('content')
 
+@can('dashboard.view')
   <h2 class="text-2xl font-bold mb-2">Dashboard DSS</h2>
 
-  {{-- Ambang umur aset (mengubah rekomendasi & lokasi) --}}
-  <div class="mb-6 flex items-center gap-3">
-    <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
-    <div class="relative">
-      <select id="ageSelect"
-        class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
-        <option value="3">3-4 Tahun (early warning)</option>
-        <option value="5" selected>5-6 Tahun (rekomendasi)</option>
-        <option value="7">7-9 Tahun (prioritas tinggi)</option>
-        <option value="10">≥ 10 tahun</option>
-      </select>
+  {{-- Ambang umur aset: tampil jika ada minimal salah satu blok yang memakainya --}}
+  @canany(['dashboard.view.kpi','dashboard.view.chart','dashboard.view.lokasi-rawan'])
+    <div class="mb-6 flex items-center gap-3">
+      <label for="ageSelect" class="text-sm font-medium">Ambang umur aset</label>
+      <div class="relative">
+        <select id="ageSelect"
+          class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
+          <option value="3">3-4 Tahun (early warning)</option>
+          <option value="5" selected>5-6 Tahun (rekomendasi)</option>
+          <option value="7">7-9 Tahun (prioritas tinggi)</option>
+          <option value="10">≥ 10 tahun</option>
+        </select>
+      </div>
+      <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
     </div>
-    <span class="text-xs text-gray-500">Mengubah rekomendasi upgrade &amp; lokasi</span>
+  @endcanany
+
+  {{-- Warning if user has none of the modules --}}
+@canany(['dashboard.view.kpi','dashboard.view.chart','dashboard.view.lokasi-rawan','dashboard.view.history'])
+  {{-- user has at least one module → no warning --}}
+@else
+  <div class="rounded-lg border bg-yellow-50 text-yellow-800 px-4 py-3">
+    Anda belum diberi akses ke modul dashboard mana pun. Minta admin untuk memberikan anda akses.
   </div>
+@endcanany
+
 
   {{-- KPI Cards --}}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-  {{-- Total Aset --}}
-  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
-    <div class="text-sm text-gray-500">Total Keseluruhan Aset</div>
-    <div id="kpiAll" class="text-2xl font-extrabold">-</div>
-    <div class="text-xs text-gray-500 mt-1">PC + Printer + Proyektor + AC</div>
-  </div>
+  @can('dashboard.view.kpi')
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+        <div class="text-sm text-gray-500">Total Keseluruhan Aset</div>
+        <div id="kpiAll" class="text-2xl font-extrabold">-</div>
+        <div class="text-xs text-gray-500 mt-1">PC + Printer + Proyektor + AC</div>
+      </div>
+      <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+        <div class="text-sm text-gray-500">Total PC</div>
+        <div id="kpiPc" class="text-2xl font-bold">-</div>
+        <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
+      </div>
+      <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+        <div class="text-sm text-gray-500">Total Printer</div>
+        <div id="kpiPrinter" class="text-2xl font-semibold">-</div>
+        <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiPrinterOld">-</span></div>
+      </div>
+      <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+        <div class="text-sm text-gray-500">Total Proyektor</div>
+        <div id="kpiProyektor" class="text-2xl font-semibold">-</div>
+        <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiProyektorOld">-</span></div>
+      </div>
+      <div class="min-w-[12rem] rounded-xl border bg-white p-4">
+        <div class="text-sm text-gray-500">Total AC</div>
+        <div id="kpiAc" class="text-2xl font-semibold">-</div>
+        <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiAcOld">-</span></div>
+      </div>
+    </div>
 
-  {{-- Total PC --}}
-  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
-    <div class="text-sm text-gray-500">Total PC</div>
-    <div id="kpiPc" class="text-2xl font-bold">-</div>
-    <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
-  </div>
-
-  {{-- Total Printer --}}
-  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
-    <div class="text-sm text-gray-500">Total Printer</div>
-    <div id="kpiPrinter" class="text-2xl font-semibold">-</div>
-    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiPrinterOld">-</span></div>
-  </div>
-
-  {{-- Total Proyektor --}}
-  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
-    <div class="text-sm text-gray-500">Total Proyektor</div>
-    <div id="kpiProyektor" class="text-2xl font-semibold">-</div>
-    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiProyektorOld">-</span></div>
-  </div>
-
-  {{-- Total AC --}}
-  <div class="min-w-[12rem] rounded-xl border bg-white p-4">
-    <div class="text-sm text-gray-500">Total AC</div>
-    <div id="kpiAc" class="text-2xl font-semibold">-</div>
-    <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiAcOld">-</span></div>
-  </div>
-</div> {{-- <- PASTIKAN div grid ini ditutup DI SINI --}}
-
-{{-- ini DI LUAR grid KPI --}}
-<div class="mb-6 text-sm text-gray-500">
-  <span id="lastUpdated">Terakhir diperbarui: -</span>
-</div>
-
+    <div class="mb-6 text-sm text-gray-500">
+      <span id="lastUpdated">Terakhir diperbarui: -</span>
+    </div>
+  @endcan
 
   {{-- Charts --}}
-  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="lg:col-span-2 rounded-xl border bg-white p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold">Tren Pengadaan 8 Tahun Terakhir</h3>
-        <div class="text-xs text-gray-500">Stacked per jenis</div>
-      </div>
-      <canvas id="barChart" height="120"></canvas>
-    </div>
-    <div class="rounded-xl border bg-white p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h3 class="font-semibold">Proporsi Aset per Jenis</h3>
-      </div>
-      <canvas id="pieChart" height="120"></canvas>
-    </div>
-  </div>
-
-  {{-- Rekomendasi Upgrade + FILTER BAR --}}
-  <div class="mt-6 rounded-xl border bg-white">
-    <div class="border-b px-4 py-3 flex items-center justify-between">
-      <h3 class="font-semibold">Rekomendasi Upgrade (Umur <span id="ageLabelNotif">5</span> tahun)</h3>
-      <span id="upgradeCount" class="text-sm text-gray-500">- item</span>
-    </div>
-
-    <div class="px-4 pt-4">
-      <div class="flex flex-col lg:flex-row lg:items-end gap-3">
-        <div>
-          <label class="block text-sm font-medium mb-1">Jenis Aset</label>
-          <select id="assetType" class="rounded-lg border border-gray-300 px-3 py-2">
-            <option value="ALL" selected>Semua</option>
-            <option value="PC">PC</option>
-            <option value="Printer">Printer</option>
-            <option value="Proyektor">Proyektor</option>
-            <option value="AC">AC</option>
-          </select>
+  @can('dashboard.view.chart')
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 rounded-xl border bg-white p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Tren Pengadaan 8 Tahun Terakhir</h3>
+          <div class="text-xs text-gray-500">Stacked per jenis</div>
         </div>
+        <canvas id="barChart" height="120"></canvas>
+      </div>
+      <div class="rounded-xl border bg-white p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold">Proporsi Aset per Jenis</h3>
+        </div>
+        <canvas id="pieChart" height="120"></canvas>
+      </div>
+    </div>
+  @endcan
 
-        <div>
-          <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
-          <div class="relative">
-            <select id="filterField"
-              class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm">
-              {{-- Options diisi via JS --}}
+  {{-- Rekomendasi Upgrade (ikut izin KPI) --}}
+  @can('dashboard.view.kpi')
+    <div class="mt-6 rounded-xl border bg-white">
+      <div class="border-b px-4 py-3 flex items-center justify-between">
+        <h3 class="font-semibold">Rekomendasi Upgrade (Umur <span id="ageLabelNotif">5</span> tahun)</h3>
+        <span id="upgradeCount" class="text-sm text-gray-500">- item</span>
+      </div>
+
+      <div class="px-4 pt-4">
+        <div class="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div>
+            <label class="block text-sm font-medium mb-1">Jenis Aset</label>
+            <select id="assetType" class="rounded-lg border border-gray-300 px-3 py-2">
+              <option value="ALL" selected>Semua</option>
+              <option value="PC">PC</option>
+              <option value="Printer">Printer</option>
+              <option value="Proyektor">Proyektor</option>
+              <option value="AC">AC</option>
             </select>
           </div>
-        </div>
 
-        <div class="flex-1">
-          <label class="block text-sm font-medium mb-1">Nilai</label>
-          <select id="filterValue" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-            <option value="" selected>Semua</option>
-          </select>
-        </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Filter Berdasarkan</label>
+            <div class="relative">
+              <select id="filterField"
+                class="appearance-none rounded-lg border border-gray-300 px-3 pr-8 py-2 text-sm"></select>
+            </div>
+          </div>
 
-        <div class="flex gap-2">
-          <button id="btnApplyFilter" class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Filter</button>
-          <button id="btnResetFilter" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Reset</button>
+          <div class="flex-1">
+            <label class="block text-sm font-medium mb-1">Nilai</label>
+            <select id="filterValue" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+              <option value="" selected>Semua</option>
+            </select>
+          </div>
+
+          <div class="flex gap-2">
+            <button id="btnApplyFilter" class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">Filter</button>
+            <button id="btnResetFilter" class="rounded-lg border px-4 py-2 hover:bg-gray-50">Reset</button>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="p-4 overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="text-left px-3 py-2">Jenis</th>
-            <th class="text-left px-3 py-2">ID</th>
-            <th class="text-left px-3 py-2">Unit/Ruang</th>
-            <th class="text-left px-3 py-2">Spesifikasi</th>
-            <th class="text-left px-3 py-2">Tahun</th>
-            <th class="text-left px-3 py-2">Umur</th>
-          </tr>
-        </thead>
-        <tbody id="upgradeBody">
-          <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
-        </tbody>
-      </table>
-      <div class="mt-3 flex items-center justify-end gap-2">
-        <button id="upPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
-        <span id="upPageInfo" class="text-sm text-gray-600">-</span>
-        <button id="upNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
-      </div>
-    </div>
-  </div>
-
-  {{-- Lokasi (judul dinamis + per-jenis) --}}
-  <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <div class="rounded-xl border bg-white">
-      <div class="border-b px-4 py-3">
-        <h3 id="lokasiTitle" class="font-semibold">Lokasi Rawan (Top-5)</h3>
-        <div class="text-xs text-gray-500">Dihitung berdasarkan bucket umur yang dipilih</div>
-      </div>
       <div class="p-4 overflow-x-auto">
         <table class="min-w-full text-sm">
           <thead class="bg-gray-50">
             <tr>
-              <th class="text-left px-3 py-2">Lokasi (Unit / Ruang)</th>
-              <th class="text-left px-3 py-2">PC</th>
-              <th class="text-left px-3 py-2">Printer</th>
-              <th class="text-left px-3 py-2">Proyektor</th>
-              <th class="text-left px-3 py-2">AC</th>
-              <th class="text-left px-3 py-2">Total</th>
+              <th class="text-left px-3 py-2">Jenis</th>
+              <th class="text-left px-3 py-2">ID</th>
+              <th class="text-left px-3 py-2">Unit/Ruang</th>
+              <th class="text-left px-3 py-2">Spesifikasi</th>
+              <th class="text-left px-3 py-2">Tahun</th>
+              <th class="text-left px-3 py-2">Umur</th>
             </tr>
           </thead>
-          <tbody id="lokasiRawanBody">
+          <tbody id="upgradeBody">
             <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
           </tbody>
         </table>
-      </div>
-    </div>
-  </div>
-
-  {{-- Histori Perbaikan/Upgrade (30 hari) --}}
-  <div class="mt-6 rounded-xl border bg-white">
-    <div class="border-b px-4 py-3 flex items-center justify-between">
-      <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-2">
-          <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
-          <select id="hisType" class="rounded border px-2 py-1 text-sm">
-            <option value="ALL" selected>Semua</option>
-            <option value="PC">PC</option>
-            <option value="Printer">Printer</option>
-            <option value="Proyektor">Proyektor</option>
-            <option value="AC">AC</option>
-          </select>
+        <div class="mt-3 flex items-center justify-end gap-2">
+          <button id="upPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
+          <span id="upPageInfo" class="text-sm text-gray-600">-</span>
+          <button id="upNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
         </div>
       </div>
     </div>
+  @endcan
 
-    <div class="p-4 overflow-x-auto">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="text-left px-3 py-2">Waktu</th>
-            <th class="text-left px-3 py-2">Aset</th>
-            <th class="text-left px-3 py-2">Aksi</th>
-            <th class="text-left px-3 py-2">Perubahan</th>
-            <th class="text-left px-3 py-2">Catatan</th>
-            <th class="text-left px-3 py-2">Edited By</th>
-          </tr>
-        </thead>
-        <tbody id="historyBody">
-          <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
-        </tbody>
-      </table>
-      <div class="mt-3 flex items-center justify-end gap-2">
-        <button id="hisPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
-        <span id="hisPageInfo" class="text-sm text-gray-600">-</span>
-        <button id="hisNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
+  {{-- Lokasi (Top-5) --}}
+  @can('dashboard.view.lokasi-rawan')
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="rounded-xl border bg-white">
+        <div class="border-b px-4 py-3">
+          <h3 id="lokasiTitle" class="font-semibold">Lokasi Rawan (Top-5)</h3>
+          <div class="text-xs text-gray-500">Dihitung berdasarkan bucket umur yang dipilih</div>
+        </div>
+        <div class="p-4 overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="text-left px-3 py-2">Lokasi (Unit / Ruang)</th>
+                <th class="text-left px-3 py-2">PC</th>
+                <th class="text-left px-3 py-2">Printer</th>
+                <th class="text-left px-3 py-2">Proyektor</th>
+                <th class="text-left px-3 py-2">AC</th>
+                <th class="text-left px-3 py-2">Total</th>
+              </tr>
+            </thead>
+            <tbody id="lokasiRawanBody">
+              <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
-  </div>
+  @endcan
 
-  {{-- Modal Quick View / Diff --}}
+  {{-- Histori Perbaikan/Upgrade (30 hari) --}}
+  @can('dashboard.view.history')
+    <div class="mt-6 rounded-xl border bg-white">
+      <div class="border-b px-4 py-3 flex items-center justify-between">
+        <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
+            <select id="hisType" class="rounded border px-2 py-1 text-sm">
+              <option value="ALL" selected>Semua</option>
+              <option value="PC">PC</option>
+              <option value="Printer">Printer</option>
+              <option value="Proyektor">Proyektor</option>
+              <option value="AC">AC</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="text-left px-3 py-2">Waktu</th>
+              <th class="text-left px-3 py-2">Aset</th>
+              <th class="text-left px-3 py-2">Aksi</th>
+              <th class="text-left px-3 py-2">Perubahan</th>
+              <th class="text-left px-3 py-2">Catatan</th>
+              <th class="text-left px-3 py-2">Edited By</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody">
+            <tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Memuat...</td></tr>
+          </tbody>
+        </table>
+        <div class="mt-3 flex items-center justify-end gap-2">
+          <button id="hisPrev" class="rounded border px-3 py-1.5 hover:bg-gray-50">Prev</button>
+          <span id="hisPageInfo" class="text-sm text-gray-600">-</span>
+          <button id="hisNext" class="rounded border px-3 py-1.5 hover:bg-gray-50">Next</button>
+        </div>
+      </div>
+    </div>
+  @endcan
+@else
+  <div class="rounded-lg border bg-yellow-50 text-yellow-800 px-4 py-3">
+    Anda tidak memiliki akses ke Dashboard.
+  </div>
+@endcan
+{{-- Modal Quick View / Diff (dipakai Upgrade & Histori) --}}
+@canany(['dashboard.view.kpi','dashboard.view.history'])
   <div id="assetModal" class="fixed inset-0 hidden items-center justify-center z-[60]">
     <div id="assetModalBackdrop" class="absolute inset-0 bg-black/40"></div>
     <div class="relative bg-white rounded-xl shadow-xl w-[95vw] max-w-4xl h-[80vh] flex flex-col">
@@ -230,21 +245,26 @@
       <div id="assetModalBody" class="p-4 overflow-y-auto grow"></div>
     </div>
   </div>
+@endcanany
+
+
 @endsection
 
 @push('body-end')
+@can('dashboard.view.chart')
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  @endcan
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
   const fmt = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' });
 
-  let barChart, pieChart;
+  let barChart=null, pieChart=null;
   let minAge = 5;
 
   const PAGE_SIZE = 10;
   let pageUp = 1;
   let upgradeAll = [];
   let upgradeFiltered = [];
-  let lastMetrics = null;
 
   const HISTORY_PAGE_SIZE = 10;
   let historyAll = [];
@@ -271,64 +291,71 @@
   };
 
   function initCharts() {
-    const barCtx = document.getElementById('barChart').getContext('2d');
-    const pieCtx = document.getElementById('pieChart').getContext('2d');
-
-    barChart = new Chart(barCtx, {
-      type: 'bar',
-      data: { labels: [], datasets: [] },
-      options: {
-        responsive: true,
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, precision: 0 } },
-        plugins: { legend: { position: 'bottom' } }
-      }
-    });
-
-    pieChart = new Chart(pieCtx, {
-      type: 'pie',
-      data: { labels: [], datasets: [{ data: [], backgroundColor: [colors.pc, colors.printer, colors.proyektor, colors.ac], borderWidth: 1 }] },
-      options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
+    const barEl = document.getElementById('barChart');
+    const pieEl = document.getElementById('pieChart');
+    if (barEl) {
+      const barCtx = barEl.getContext('2d');
+      barChart = new Chart(barCtx, {
+        type: 'bar',
+        data: { labels: [], datasets: [] },
+        options: {
+          responsive: true,
+          scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, precision: 0 } },
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+    if (pieEl) {
+      const pieCtx = pieEl.getContext('2d');
+      pieChart = new Chart(pieCtx, {
+        type: 'pie',
+        data: { labels: [], datasets: [{ data: [], backgroundColor: [colors.pc, colors.printer, colors.proyektor, colors.ac], borderWidth: 1 }] },
+        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
   }
 
+  function setText(id, val) { const el=document.getElementById(id); if (el) el.textContent = val; }
+
   function updateKpis(m) {
-    document.getElementById('kpiPc').textContent = m.totals.pc;
-    document.getElementById('kpiPrinter').textContent = m.totals.printer;
-    document.getElementById('kpiProyektor').textContent = m.totals.proyektor;
-    document.getElementById('kpiAc').textContent = m.totals.ac;
+    setText('kpiPc', m.totals?.pc ?? '-');
+    setText('kpiPrinter', m.totals?.printer ?? '-');
+    setText('kpiProyektor', m.totals?.proyektor ?? '-');
+    setText('kpiAc', m.totals?.ac ?? '-');
 
-    // BARU: total semua aset
-  const totalAll = (m.totals.pc || 0) + (m.totals.printer || 0) + (m.totals.proyektor || 0) + (m.totals.ac || 0);
-  const elAll = document.getElementById('kpiAll');
-  if (elAll) elAll.textContent = totalAll;
+    const totalAll = (m.totals?.pc || 0)+(m.totals?.printer || 0)+(m.totals?.proyektor || 0)+(m.totals?.ac || 0);
+    setText('kpiAll', totalAll);
 
-    document.getElementById('kpiPcOld').textContent = m.totals.old.pc;
-    document.getElementById('kpiPrinterOld').textContent = m.totals.old.printer;
-    document.getElementById('kpiProyektorOld').textContent = m.totals.old.proyektor;
-    document.getElementById('kpiAcOld').textContent = m.totals.old.ac;
+    setText('kpiPcOld', m.totals?.old?.pc ?? '-');
+    setText('kpiPrinterOld', m.totals?.old?.printer ?? '-');
+    setText('kpiProyektorOld', m.totals?.old?.proyektor ?? '-');
+    setText('kpiAcOld', m.totals?.old?.ac ?? '-');
 
-    document.getElementById('lastUpdated').textContent = 'Terakhir diperbarui: ' + fmt.format(new Date(m.now_epoch));
+    const last = document.getElementById('lastUpdated');
+    if (last) last.textContent = 'Terakhir diperbarui: ' + fmt.format(new Date(m.now_epoch));
 
     const bucketLabel = (m.age_bucket && m.age_bucket.label) ? m.age_bucket.label : (m.min_age ?? minAge);
-    document.getElementById('ageLabelKpi').textContent = bucketLabel;
-    document.getElementById('ageLabelNotif').textContent = bucketLabel;
+    setText('ageLabelKpi', bucketLabel);
+    setText('ageLabelNotif', bucketLabel);
     document.querySelectorAll('.ageLabel').forEach(el => el.textContent = bucketLabel);
   }
 
   function updateBar(m) {
-    barChart.data.labels = m.bar.labels;
+    if (!barChart) return;
+    barChart.data.labels = m.bar?.labels || [];
     barChart.data.datasets = [
-      { label: 'PC', data: m.bar.datasets.pc, backgroundColor: colors.pc },
-      { label: 'Printer', data: m.bar.datasets.printer, backgroundColor: colors.printer },
-      { label: 'Proyektor', data: m.bar.datasets.proyektor, backgroundColor: colors.proyektor },
-      { label: 'AC', data: m.bar.datasets.ac, backgroundColor: colors.ac },
+      { label: 'PC', data: m.bar?.datasets?.pc || [], backgroundColor: colors.pc },
+      { label: 'Printer', data: m.bar?.datasets?.printer || [], backgroundColor: colors.printer },
+      { label: 'Proyektor', data: m.bar?.datasets?.proyektor || [], backgroundColor: colors.proyektor },
+      { label: 'AC', data: m.bar?.datasets?.ac || [], backgroundColor: colors.ac },
     ];
     barChart.update();
   }
 
   function updatePie(m) {
-    pieChart.data.labels = m.pie.labels;
-    pieChart.data.datasets[0].data = m.pie.data;
+    if (!pieChart) return;
+    pieChart.data.labels = m.pie?.labels || [];
+    pieChart.data.datasets[0].data = m.pie?.data || [];
     pieChart.options.plugins.tooltip = {
       callbacks: {
         label: (ctx) => {
@@ -373,6 +400,7 @@
 
   function buildFieldOptions() {
     const fieldSel = document.getElementById('filterField');
+    if (!fieldSel) return;
     const defs = FIELD_MAP[assetType] || FIELD_MAP.ALL;
     fieldSel.innerHTML = defs.map(d => `<option value="${d.key}">${d.label}</option>`).join('');
     const keys = defs.map(d => d.key);
@@ -387,6 +415,8 @@
 
   function buildValueOptions(preservedValue = '') {
     const sel = document.getElementById('filterValue');
+    if (!sel) return;
+
     let base = [...upgradeAll];
     if (assetType !== 'ALL') base = base.filter(u => u.type === assetType);
 
@@ -426,10 +456,50 @@
     }
   }
 
+  function renderUpgradePage(list) {
+    const body = document.getElementById('upgradeBody');
+    if (!body) return;
+    const total = list.length;
+    const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    pageUp = Math.min(Math.max(1, pageUp), maxPage);
+
+    setText('upgradeCount', `${total} item`);
+    setText('upPageInfo', `${pageUp} / ${maxPage}`);
+
+    if (!total) {
+      body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Tidak ada rekomendasi upgrade.</td></tr>`;
+      return;
+    }
+
+    const start = (pageUp - 1) * PAGE_SIZE;
+    const rows = list.slice(start, start + PAGE_SIZE);
+
+    body.innerHTML = rows.map(item => `
+      <tr class="border-t hover:bg-gray-50 cursor-pointer" data-type="${item.type}" data-id="${item.id}">
+        <td class="px-3 py-2">${item.type}</td>
+        <td class="px-3 py-2 font-medium">${item.id}</td>
+        <td class="px-3 py-2">${(item.unit_kerja ?? item.nama_ruang ?? '-')} / ${(item.ruang ?? '-')}</td>
+        <td class="px-3 py-2">${item.spes ?? '-'}</td>
+        <td class="px-3 py-2">${item.tahun_pembelian ?? '-'}</td>
+        <td class="px-3 py-2">${item.umur} th</td>
+      </tr>
+    `).join('');
+
+    const prevBtn = document.getElementById('upPrev');
+    const nextBtn = document.getElementById('upNext');
+    if (prevBtn) prevBtn.onclick = () => { pageUp--; renderUpgradePage(list); };
+    if (nextBtn) nextBtn.onclick = () => { pageUp++; renderUpgradePage(list); };
+  }
+
   function applyDropdownFilter() {
-    assetType   = document.getElementById('assetType').value;
-    filterField = document.getElementById('filterField').value;
-    filterValue = document.getElementById('filterValue').value;
+    const assetSel = document.getElementById('assetType');
+    const fieldSel = document.getElementById('filterField');
+    const valueSel = document.getElementById('filterValue');
+    if (!assetSel || !fieldSel || !valueSel) return;
+
+    assetType   = assetSel.value;
+    filterField = fieldSel.value;
+    filterValue = valueSel.value;
 
     let list = [...upgradeAll];
     if (assetType !== 'ALL') list = list.filter(u => u.type === assetType);
@@ -458,57 +528,29 @@
     renderUpgradePage(upgradeFiltered);
   }
 
-  function renderUpgradePage(list) {
-    const body = document.getElementById('upgradeBody');
-    const total = list.length;
-    const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    pageUp = Math.min(Math.max(1, pageUp), maxPage);
-
-    document.getElementById('upgradeCount').textContent = `${total} item`;
-    document.getElementById('upPageInfo').textContent = `${pageUp} / ${maxPage}`;
-
-    if (!total) {
-      body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Tidak ada rekomendasi upgrade.</td></tr>`;
-      return;
-    }
-
-    const start = (pageUp - 1) * PAGE_SIZE;
-    const rows = list.slice(start, start + PAGE_SIZE);
-
-    body.innerHTML = rows.map(item => `
-      <tr class="border-t hover:bg-gray-50 cursor-pointer" data-type="${item.type}" data-id="${item.id}">
-        <td class="px-3 py-2">${item.type}</td>
-        <td class="px-3 py-2 font-medium">${item.id}</td>
-        <td class="px-3 py-2">${(item.unit_kerja ?? item.nama_ruang ?? '-')} / ${(item.ruang ?? '-')}</td>
-        <td class="px-3 py-2">${item.spes ?? '-'}</td>
-        <td class="px-3 py-2">${item.tahun_pembelian ?? '-'}</td>
-        <td class="px-3 py-2">${item.umur} th</td>
-      </tr>
-    `).join('');
-
-    document.getElementById('upPrev').onclick = () => { pageUp--; renderUpgradePage(list); };
-    document.getElementById('upNext').onclick = () => { pageUp++; renderUpgradePage(list); };
-  }
-
   function updateUpgradeTable(m) {
-    const prevAssetType = document.getElementById('assetType').value;
-    const prevField = document.getElementById('filterField').value || filterField;
-    const prevValue = document.getElementById('filterValue').value || filterValue;
+    const upBody = document.getElementById('upgradeBody');
+    if (!upBody) return;
+
+    const prevAssetType = document.getElementById('assetType')?.value || 'ALL';
+    const prevField = document.getElementById('filterField')?.value || filterField;
+    const prevValue = document.getElementById('filterValue')?.value || filterValue;
 
     upgradeAll = m.upgrade || [];
-
-    assetType = prevAssetType || 'ALL';
+    assetType = prevAssetType;
     buildFieldOptions();
     filterField = prevField;
     buildValueOptions(prevValue);
-
     applyDropdownFilter();
   }
 
-  // ===== Lokasi (judul dinamis + per-jenis) =====
+  // Lokasi
   function updateLokasiRawan(m) {
-    document.getElementById('lokasiTitle').textContent = m.lokasi_title || 'Lokasi Rawan';
     const tbody = document.getElementById('lokasiRawanBody');
+    if (!tbody) return;
+    const title = document.getElementById('lokasiTitle');
+    if (title) title.textContent = m.lokasi_title || 'Lokasi Rawan';
+
     const arr = m.lokasi_rawan || [];
     if (!arr.length) {
       tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">Tidak ada data.</td></tr>`;
@@ -526,15 +568,18 @@
     `).join('');
   }
 
-  // ===== History (AJAX) =====
+  // History
   function updateHistory(m) {
+    const body = document.getElementById('historyBody');
+    if (!body) return;
     historyAll = Array.isArray(m.history) ? m.history : [];
-    applyHistoryFilter(true); // reset ke page 1
+    applyHistoryFilter(true);
   }
 
   function applyHistoryFilter(resetPage = true) {
     const sel = document.getElementById('hisType');
-    hisType = sel ? (sel.value || 'ALL') : 'ALL';
+    if (!sel) return;
+    hisType = sel.value || 'ALL';
 
     let list = historyAll;
     if (hisType !== 'ALL') {
@@ -549,11 +594,13 @@
 
   function renderHistoryPage(list) {
     const body = document.getElementById('historyBody');
+    if (!body) return;
+
     const total = list.length;
     const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
     pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
 
-    document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
+    setText('hisPageInfo', `${pageHistory} / ${maxPage}`);
 
     if (!total) {
       body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
@@ -584,14 +631,16 @@
       </tr>
     `).join('');
 
-    // Pagination handlers
-    document.getElementById('hisPrev').onclick = () => { pageHistory--; renderHistoryPage(list); };
-    document.getElementById('hisNext').onclick = () => { pageHistory++; renderHistoryPage(list); };
+    const prev = document.getElementById('hisPrev');
+    const next = document.getElementById('hisNext');
+    if (prev) prev.onclick = () => { pageHistory--; renderHistoryPage(list); };
+    if (next) next.onclick = () => { pageHistory++; renderHistoryPage(list); };
   }
 
-  // ====== DETAIL INVENTORY (modal) ======
+  // Modal util
   function openModal() {
     const modal = document.getElementById('assetModal');
+    if (!modal) return;
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     document.body.style.overflow = 'hidden';
@@ -599,10 +648,11 @@
   function closeModal() {
     const modal = document.getElementById('assetModal');
     const body  = document.getElementById('assetModalBody');
+    if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
     document.body.style.overflow = '';
-    body.innerHTML = '';
+    if (body) body.innerHTML = '';
   }
   document.addEventListener('click', (e) => {
     if (e.target.id === 'assetModalBackdrop' || e.target.id === 'assetModalClose') closeModal();
@@ -614,6 +664,7 @@
     if (!base || !id) return;
     const titleEl = document.getElementById('assetModalTitle');
     const bodyEl  = document.getElementById('assetModalBody');
+    if (!titleEl || !bodyEl) return;
 
     titleEl.textContent = `Detail ${type} - ${id}`;
     bodyEl.innerHTML = `
@@ -634,7 +685,6 @@
     }
   }
 
-  // ====== HISTORI: parse & tampilkan field berubah (untuk modal) ======
   function parseChanges(h) {
     if (Array.isArray(h.changes) && h.changes.length) {
       return h.changes.map(c => ({
@@ -664,6 +714,7 @@
   function openHistoryModal(h) {
     const titleEl = document.getElementById('assetModalTitle');
     const bodyEl  = document.getElementById('assetModalBody');
+    if (!titleEl || !bodyEl) return;
 
     titleEl.textContent = `Perubahan ${h.asset_type} • ${h.asset_id}`;
 
@@ -715,8 +766,8 @@
     openModal();
   }
 
-  // ===== Init & Events =====
   document.addEventListener('DOMContentLoaded', () => {
+    // Inisialisasi charts bila kanvas ada
     initCharts();
 
     // Age bucket
@@ -729,44 +780,53 @@
     }
 
     // Upgrade filters
-    document.getElementById('assetType').addEventListener('change', () => {
-      assetType = document.getElementById('assetType').value;
+    const assetSel = document.getElementById('assetType');
+    const fieldSel = document.getElementById('filterField');
+    const valueSel = document.getElementById('filterValue');
+    const applyBtn = document.getElementById('btnApplyFilter');
+    const resetBtn = document.getElementById('btnResetFilter');
+
+    if (assetSel) assetSel.addEventListener('change', () => {
+      assetType = assetSel.value;
       pageUp = 1;
       buildFieldOptions();
       buildValueOptions('');
       applyDropdownFilter();
     });
-    document.getElementById('filterField').addEventListener('change', () => {
-      filterField = document.getElementById('filterField').value;
+    if (fieldSel) fieldSel.addEventListener('change', () => {
+      filterField = fieldSel.value;
       pageUp = 1;
       buildValueOptions('');
     });
-    document.getElementById('btnApplyFilter').addEventListener('click', applyDropdownFilter);
-    document.getElementById('btnResetFilter').addEventListener('click', () => {
-      document.getElementById('assetType').value = 'ALL';
+    if (applyBtn) applyBtn.addEventListener('click', applyDropdownFilter);
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+      if (!assetSel || !valueSel) return;
+      assetSel.value = 'ALL';
       assetType = 'ALL';
       pageUp = 1;
       buildFieldOptions();
       buildValueOptions('');
-      document.getElementById('filterValue').value = '';
+      valueSel.value = '';
       filterValue = '';
       upgradeFiltered = [...upgradeAll];
       renderUpgradePage(upgradeFiltered);
     });
 
     // Delegasi klik baris rekomendasi → detail inventory
-    document.getElementById('upgradeBody').addEventListener('click', (e) => {
+    const upBody = document.getElementById('upgradeBody');
+    if (upBody) upBody.addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-type][data-id]');
       if (!tr) return;
       openDetailModal(tr.dataset.type, tr.dataset.id);
     });
 
     // Filter type history
-    const sel = document.getElementById('hisType');
-    if (sel) sel.addEventListener('change', () => applyHistoryFilter(true));
+    const hisSel = document.getElementById('hisType');
+    if (hisSel) hisSel.addEventListener('change', () => applyHistoryFilter(true));
 
-    // Klik baris history → modal diff (pakai list yang sudah difilter & dipaginasi)
-    document.getElementById('historyBody').addEventListener('click', (e) => {
+    // Klik baris history → modal diff
+    const hisBody = document.getElementById('historyBody');
+    if (hisBody) hisBody.addEventListener('click', (e) => {
       const tr = e.target.closest('tr[data-idx]');
       if (!tr) return;
       const idx = parseInt(tr.dataset.idx, 10);
@@ -786,8 +846,8 @@
     try {
       const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
       const metrics = await res.json();
-      lastMetrics = metrics;
 
+      // Update blok-blok yang ada saja
       updateKpis(metrics);
       updateBar(metrics);
       updatePie(metrics);

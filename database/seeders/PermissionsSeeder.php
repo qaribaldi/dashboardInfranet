@@ -44,8 +44,7 @@ class PermissionsSeeder extends Seeder
 
         // Dashboard
         $dashboardPerms = [
-            'dashboard.view','dashboard.view.history',
-            'dashboard.view.lokasi-rawan','dashboard.view.kpi','dashboard.view.chart',
+            'dashboard.view', 'dashboard.view.history', 'dashboard.view.lokasi-rawan', 'dashboard.view.kpi', 'dashboard.view.chart',	
         ];
 
         foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms) as $name) {
@@ -60,9 +59,12 @@ class PermissionsSeeder extends Seeder
 
         // user default: hanya view inventory + semua view dashboard
         $userDefaultPerms = [
-            'inventory.pc.view','inventory.printer.view','inventory.proyektor.view','inventory.ac.view','inventory.hardware.view',
-            'dashboard.view','dashboard.view.history','dashboard.view.lokasi-rawan','dashboard.view.kpi','dashboard.view.chart',
-        ];
-        $user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());
+    'inventory.pc.view','inventory.printer.view','inventory.proyektor.view',
+    'inventory.ac.view','inventory.hardware.view',
+    'dashboard.view',                    // hanya bisa buka halaman
+    // kalau mau default-nya lihat lokasi rawan, tambahkan ini:
+    // 'dashboard.view.lokasi-rawan',
+];
+$user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());
     }
 }
