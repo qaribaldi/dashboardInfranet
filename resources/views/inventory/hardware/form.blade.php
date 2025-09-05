@@ -6,7 +6,9 @@
   <form action="{{ $mode === 'create'
       ? route('inventory.hardware.store')
       : route('inventory.hardware.update',$data->id_hardware) }}"
-        method="POST" class="space-y-5">
+        method="POST" class="space-y-5"
+        data-mode="{{ $mode }}"
+        data-initial-selected-count="{{ isset($selectedPcs) ? count($selectedPcs) : 0 }}">
     @csrf
     @if($mode === 'edit') @method('PUT') @endif
 
@@ -85,15 +87,22 @@
         <label class="block text-sm font-medium mb-1" for="jumlah_stock">Jumlah Stock</label>
         <input type="number" min="0" id="jumlah_stock" name="jumlah_stock"
                value="{{ old('jumlah_stock', $data->jumlah_stock) }}"
-               class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+               class="w-full rounded-lg border border-gray-300 px-3 py-2"
+               {{ $mode === 'edit' ? 'readonly' : '' }} />
+        @if($mode === 'edit')
+          <p class="text-xs text-gray-500 mt-1">Pada mode <b>Edit</b>, stok akan otomatis berubah mengikuti penambahan/penghapusan PC.</p>
+        @else
+          <p class="text-xs text-gray-500 mt-1">Stok awal akan dikurangi sebanyak jumlah PC yang kamu pilih.</p>
+        @endif
+        <div id="stock_preview" class="text-xs mt-1"></div>
         @error('jumlah_stock') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
       @endif
 
-      {{-- Status (opsi baru) --}}
+      {{-- Status --}}
       @if(array_key_exists('status',$fields))
       @php
-        $statusOps = $statusOptions ?? ['In use','In store','Service'];
+        $statusOps = $statusOptions ?? ['In use','In store','Service','available'];
         $currentStatus = old('status', $data->status ?? '');
         $mapOldToNew = ['available'=>'In store','in_use'=>'In use','broken'=>'Service'];
         if (isset($mapOldToNew[$currentStatus])) $currentStatus = $mapOldToNew[$currentStatus];
@@ -105,43 +114,46 @@
             <option value="{{ $opt }}" {{ $currentStatus === $opt ? 'selected' : '' }}>{{ $opt }}</option>
           @endforeach
         </select>
-        <p class="text-xs text-gray-500 mt-1">Jika <b>In use</b>, isi Tanggal Digunakan &amp; ID PC.</p>
+        <p class="text-xs text-gray-500 mt-1">
+          Jika <b>In use</b>, isi <b>Tanggal Digunakan</b> &amp; pilih <b>ID PC</b> (bisa banyak).
+        </p>
         @error('status') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
       @endif
 
-      {{-- Tanggal Digunakan (muncul jika status = In use) --}}
-      @if(array_key_exists('tanggal_digunakan',$fields))
-      @php
-        $inUseNow = ($currentStatus === 'In use');
-        $tdRaw = old('tanggal_digunakan', $data->tanggal_digunakan ?? null);
-        $tdVal = $tdRaw ? \Illuminate\Support\Carbon::parse($tdRaw)->format('Y-m-d') : '';
-      @endphp
-      <div id="field_tanggal_digunakan" class="{{ $inUseNow ? '' : 'hidden' }}">
+      {{-- Tanggal Digunakan (untuk PC yang BARU ditambahkan) --}}
+      <div id="field_tanggal_digunakan" class="{{ ($currentStatus === 'In use') ? '' : 'hidden' }}">
+        @php
+          $tdRaw = old('tanggal_digunakan', null); // pada edit, tanggal lama tetap di pivot
+          $tdVal = $tdRaw ? \Illuminate\Support\Carbon::parse($tdRaw)->format('Y-m-d') : '';
+        @endphp
         <label class="block text-sm font-medium mb-1" for="tanggal_digunakan">Tanggal Digunakan</label>
         <input type="date" id="tanggal_digunakan" name="tanggal_digunakan"
                value="{{ $tdVal }}"
-               class="w-full rounded-lg border border-gray-300 px-3 py-2" {{ $inUseNow ? '' : 'disabled' }} />
+               class="w-full rounded-lg border border-gray-300 px-3 py-2" {{ ($currentStatus === 'In use') ? '' : 'disabled' }} />
+        <p class="text-xs text-gray-500 mt-1">Saat <b>Edit</b>, tanggal ini hanya diterapkan ke PC yang <b>baru ditambahkan</b>.</p>
         @error('tanggal_digunakan') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
-      @endif
 
-      {{-- ID PC (dropdown, muncul jika status = In use) --}}
-      @if(array_key_exists('id_pc',$fields))
-      @php $inUseNow = ($currentStatus === 'In use'); @endphp
-      <div id="field_id_pc" class="{{ $inUseNow ? '' : 'hidden' }}">
-        <label class="block text-sm font-medium mb-1" for="id_pc">ID PC</label>
-        <select id="id_pc" name="id_pc" class="w-full rounded-lg border border-gray-300 px-3 py-2" {{ $inUseNow ? '' : 'disabled' }}>
-          <option value="">— pilih ID PC —</option>
+      {{-- MULTI-SELECT: ID PC (pakai Choices.js) --}}
+      <div id="field_pcs" class="{{ ($currentStatus === 'In use') ? '' : 'hidden' }}">
+        <label class="block text-sm font-medium mb-1" for="pcs">ID PC (bisa pilih banyak)</label>
+        @php
+          $selected = old('pcs', $selectedPcs ?? []);
+        @endphp
+        <select id="pcs" name="pcs[]" multiple>
           @foreach(($pcIds ?? []) as $pid)
-            <option value="{{ $pid }}" @selected(old('id_pc', $data->id_pc ?? '') === $pid)>{{ $pid }}</option>
+            <option value="{{ $pid }}" {{ in_array($pid, $selected, true) ? 'selected' : '' }}>{{ $pid }}</option>
           @endforeach
         </select>
-        @error('id_pc') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+        <p class="text-xs text-gray-500 mt-1">
+          Klik untuk memilih; item terpilih akan muncul sebagai chip (tanpa perlu tahan Shift/Ctrl).
+        </p>
+        @error('pcs') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+        @error('pcs.*') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
-      @endif
 
-      {{-- Kolom dinamis lain (auto: date / datetime / text) --}}
+      {{-- Kolom dinamis lain --}}
       @foreach($fields as $name => $label)
         @continue(in_array($name, [
           'id_hardware','jenis_hardware','storage_type','vendor',
@@ -196,6 +208,10 @@
     </div>
   </form>
 
+  {{-- Choices.js (CDN) --}}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+
   <script>
     const jenisEl       = document.getElementById('jenis_hardware');
     const storageWrap   = document.getElementById('field_storage_type');
@@ -204,8 +220,16 @@
     const statusEl      = document.getElementById('status');
     const usedDateWrap  = document.getElementById('field_tanggal_digunakan');
     const usedDateInput = document.getElementById('tanggal_digunakan');
-    const idPcWrap      = document.getElementById('field_id_pc');
-    const idPcInput     = document.getElementById('id_pc');
+    const pcsWrap       = document.getElementById('field_pcs');
+    const pcsSelect     = document.getElementById('pcs');
+
+    const stokInput     = document.getElementById('jumlah_stock');
+    const stockPreview  = document.getElementById('stock_preview');
+    const formEl        = document.querySelector('form[method="POST"]');
+    const mode          = formEl?.dataset?.mode || 'create';
+    const initialSelCnt = parseInt(formEl?.dataset?.initialSelectedCount || '0', 10);
+
+    let choicesInstance = null;
 
     function setHidden(el, hidden, inputEl = null, required = false) {
       if (!el) return;
@@ -224,19 +248,75 @@
 
     function onStatusChange() {
       const inUse = (statusEl?.value === 'In use');
-      setHidden(usedDateWrap, !inUse, usedDateInput, true);
-      setHidden(idPcWrap,     !inUse, idPcInput,     true);
-      if (!inUse) {
-        if (usedDateInput) usedDateInput.value = '';
-        if (idPcInput)     idPcInput.value     = '';
+      setHidden(usedDateWrap, !inUse, usedDateInput, false);
+      setHidden(pcsWrap,      !inUse, pcsSelect,     false);
+      if (!inUse && choicesInstance) {
+        // Tidak menghapus pilihan; controller akan mengabaikan jika bukan In use.
+      }
+      updateStockPreview();
+    }
+
+    function initChoices() {
+      if (!pcsSelect) return;
+      choicesInstance = new Choices(pcsSelect, {
+        removeItemButton: true,
+        placeholder: true,
+        placeholderValue: 'Pilih satu atau lebih PC…',
+        searchPlaceholderValue: 'Cari PC…',
+        shouldSort: false,
+        itemSelectText: '',
+      });
+      pcsSelect.addEventListener('change', updateStockPreview);
+    }
+
+    function getSelectedCount() {
+      if (!pcsSelect) return 0;
+      // Saat sudah diinisialisasi Choices, <select> tetap sinkron dengan value terpilih
+      return Array.from(pcsSelect.selectedOptions || []).length;
+    }
+
+    function updateStockPreview() {
+      if (!stockPreview) return;
+
+      const inUse = (statusEl?.value === 'In use');
+      const selected = getSelectedCount();
+
+      if (mode === 'create') {
+        const stokAwal = parseInt(stokInput?.value || '0', 10);
+        if (inUse && stokInput) {
+          const final = stokAwal - selected;
+          stockPreview.textContent =
+            `Perkiraan stok akhir: ${final} (stok awal ${stokAwal} − ${selected} PC dipilih)`;
+          stockPreview.className =
+            'text-xs mt-1 ' + (final < 0 ? 'text-red-600' : 'text-gray-600');
+        } else {
+          stockPreview.textContent = '';
+        }
+      } else {
+        // edit: preview berdasarkan selisih (added - removed)
+        const delta = selected - initialSelCnt;
+        if (inUse) {
+          const now = parseInt(stokInput?.value || '0', 10);
+          const final = now - Math.max(delta, 0) + Math.max(-delta, 0); // tampilkan ilustrasi saja
+          const sign = (delta > 0 ? `− ${delta}` : delta < 0 ? `+ ${-delta}` : '± 0');
+          stockPreview.textContent =
+            `Stok akan disesuaikan: ${sign} unit (berdasarkan perubahan pilihan PC).`;
+          stockPreview.className = 'text-xs mt-1 text-gray-600';
+        } else {
+          stockPreview.textContent = '';
+        }
       }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
       onJenisChange();
       onStatusChange();
+      initChoices();
+      updateStockPreview();
+
       jenisEl?.addEventListener('change', onJenisChange);
       statusEl?.addEventListener('change', onStatusChange);
+      stokInput?.addEventListener('input', updateStockPreview);
     });
   </script>
 @endsection

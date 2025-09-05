@@ -86,8 +86,11 @@
 
     $jenis = request('jenis', '');
     $allCols = Schema::getColumnListing('inventory_hardware');
-    $skip = ['created_at','updated_at','specs'];
+
+    // Kolom yang tidak ditampilkan sebagai kolom dinamis
+    $skip = ['created_at','updated_at','specs','id_pc','tanggal_digunakan'];
     if ($jenis !== 'storage') { $skip[] = 'storage_type'; }
+
     $cols = array_values(array_diff($allCols, $skip));
     $titleize = fn($s) => ucwords(str_replace('_',' ', $s));
   @endphp
@@ -99,15 +102,41 @@
           @foreach($cols as $c)
             <th class="text-left px-4 py-3 font-semibold">{{ $titleize($c) }}</th>
           @endforeach
+          {{-- dua kolom tetap dari PIVOT --}}
+          <th class="text-left px-4 py-3 font-semibold">Id Pc</th>
           <th class="px-4 py-3"></th>
         </tr>
       </thead>
       <tbody>
         @forelse($items as $row)
           <tr class="border-t">
+            {{-- kolom dinamis dari tabel master --}}
             @foreach($cols as $c)
               <td class="px-4 py-2">{{ data_get($row, $c) ?? '—' }}</td>
             @endforeach
+
+
+            {{-- Daftar PC terpasang (dari pivot) --}}
+            <td class="px-4 py-2">
+              @if(!empty($row->pcs) && count($row->pcs))
+                <div class="flex flex-wrap gap-1">
+                  @foreach($row->pcs as $pc)
+                    <span class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5">
+                      {{ $pc->id_pc }}
+                      @if($pc->pivot->tanggal_digunakan)
+                        <span class="text-[11px] text-gray-500">
+                          {{ \Illuminate\Support\Carbon::parse($pc->pivot->tanggal_digunakan)->format('Y-m-d') }}
+                        </span>
+                      @endif
+                    </span>
+                  @endforeach
+                </div>
+              @else
+                —
+              @endif
+            </td>
+
+            {{-- Aksi --}}
             <td class="px-4 py-2 text-right whitespace-nowrap">
               <a href="javascript:void(0)"
                  onclick="openModal('{{ route('inventory.hardware.show',$row->id_hardware) }}','Detail Hardware - {{ $row->id_hardware }}')"
@@ -131,7 +160,7 @@
           </tr>
         @empty
           <tr>
-            <td colspan="{{ count($cols)+1 }}" class="px-4 py-6 text-center text-gray-500">Belum ada data.</td>
+            <td colspan="{{ count($cols)+3 }}" class="px-4 py-6 text-center text-gray-500">Belum ada data.</td>
           </tr>
         @endforelse
       </tbody>
