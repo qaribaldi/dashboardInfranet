@@ -9,6 +9,7 @@ use App\Http\Controllers\AssetPrinterController;
 use App\Http\Controllers\AssetProyektorController;
 use App\Http\Controllers\AssetAcController;
 use App\Http\Controllers\InventoryHardwareController;
+use App\Http\Controllers\InventoryLabkomController; // LABKOM
 
 // Admin
 use App\Http\Controllers\Admin\UserManagementController;
@@ -54,6 +55,7 @@ Route::get('/inventory', function () {
     if ($u->can('inventory.proyektor.view')) return redirect()->route('inventory.proyektor.index');
     if ($u->can('inventory.ac.view'))        return redirect()->route('inventory.ac.index');
     if ($u->can('inventory.hardware.view'))  return redirect()->route('inventory.hardware.index');
+    if ($u->can('inventory.labkom.view'))    return redirect()->route('inventory.labkom.index');
 
     abort(403, 'Anda tidak punya izin melihat inventory.');
 })->middleware('auth')->name('inventory');
@@ -78,7 +80,7 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('pc/{pc}', [AssetPcController::class, 'destroy'])
         ->middleware('permission:inventory.pc.delete')->name('pc.destroy');
 
-    // Import CSV + Template (PER ASET)
+    // Import CSV + Template
     Route::get('pc/import', [AssetPcController::class,'importForm'])
         ->middleware('permission:inventory.pc.import')->name('pc.importForm');
     Route::post('pc/import', [AssetPcController::class,'importStore'])
@@ -86,7 +88,7 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::get('pc/template', [AssetPcController::class,'downloadTemplate'])
         ->middleware('permission:inventory.pc.import')->name('pc.template');
 
-    // Kelola Kolom (PER ASET)
+    // Kelola Kolom
     Route::post  ('pc/columns',        [AssetPcController::class,'addColumn'])
         ->middleware('permission:inventory.pc.columns')->name('pc.columns.add');
     Route::post  ('pc/columns/rename', [AssetPcController::class,'renameColumn'])
@@ -205,14 +207,42 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
         ->middleware('permission:inventory.hardware.columns')->name('hardware.columns.rename');
     Route::delete('hardware/columns/drop',   [InventoryHardwareController::class,'dropColumn'])
         ->middleware('permission:inventory.hardware.columns')->name('hardware.columns.drop');
+
+    // ===== LABKOM =====
+    Route::get('labkom/create', [InventoryLabkomController::class, 'create'])
+        ->middleware('permission:inventory.labkom.create')->name('labkom.create');
+    Route::post('labkom', [InventoryLabkomController::class, 'store'])
+        ->middleware('permission:inventory.labkom.create')->name('labkom.store');
+
+    Route::get('labkom/{labkom}/edit', [InventoryLabkomController::class, 'edit'])
+        ->middleware('permission:inventory.labkom.edit')->name('labkom.edit');
+    Route::put('labkom/{labkom}', [InventoryLabkomController::class, 'update'])
+        ->middleware('permission:inventory.labkom.edit')->name('labkom.update');
+
+    Route::delete('labkom/{labkom}', [InventoryLabkomController::class, 'destroy'])
+        ->middleware('permission:inventory.labkom.delete')->name('labkom.destroy');
+
+    // Import CSV + Template — LABKOM
+    Route::get('labkom/import', [InventoryLabkomController::class,'importForm'])
+        ->middleware('permission:inventory.labkom.import')->name('labkom.importForm');
+    Route::post('labkom/import', [InventoryLabkomController::class,'importStore'])
+        ->middleware('permission:inventory.labkom.import')->name('labkom.importStore');
+    Route::get('labkom/template', [InventoryLabkomController::class,'downloadTemplate'])
+        ->middleware('permission:inventory.labkom.import')->name('labkom.template');
+
+    // Kelola Kolom — LABKOM
+    Route::post  ('labkom/columns',        [InventoryLabkomController::class,'addColumn'])
+        ->middleware('permission:inventory.labkom.columns')->name('labkom.columns.add');
+    Route::post  ('labkom/columns/rename', [InventoryLabkomController::class,'renameColumn'])
+        ->middleware('permission:inventory.labkom.columns')->name('labkom.columns.rename');
+    Route::delete('labkom/columns/drop',   [InventoryLabkomController::class,'dropColumn'])
+        ->middleware('permission:inventory.labkom.columns')->name('labkom.columns.drop');
 });
 
 /**
  * ============================================================
  * INVENTORY (VIEW: index/show) — Dipagari permission *.view
  * ============================================================
- * Gantikan blok "READ-ONLY untuk semua user login" menjadi
- * definisi per-modul dengan middleware permission berikut.
  */
 Route::prefix('inventory')->name('inventory.')->group(function () {
 
@@ -240,6 +270,11 @@ Route::prefix('inventory')->name('inventory.')->group(function () {
     Route::middleware(['auth','permission:inventory.hardware.view'])->group(function () {
         Route::resource('hardware', InventoryHardwareController::class)->only(['index','show']);
     });
+
+    // LABKOM
+    Route::middleware(['auth','permission:inventory.labkom.view'])->group(function () {
+        Route::resource('labkom', InventoryLabkomController::class)->only(['index','show']);
+    });
 });
 
 /**
@@ -254,5 +289,5 @@ Route::prefix('admin')->middleware(['auth','admin'])->name('admin.')->group(func
     Route::delete('users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
 });
 
-// Auth routes (Breeze/Fortify/etc)
+// Auth routes
 require __DIR__.'/auth.php';

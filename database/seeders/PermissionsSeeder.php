@@ -22,6 +22,8 @@ class PermissionsSeeder extends Seeder
             'inventory.ac.view','inventory.ac.create','inventory.ac.edit','inventory.ac.delete',
             // Hardware
             'inventory.hardware.view','inventory.hardware.create','inventory.hardware.edit','inventory.hardware.delete',
+            // LABKOM 
+            'inventory.labkom.view','inventory.labkom.create','inventory.labkom.edit','inventory.labkom.delete',
         ];
 
         // Import/Export per aset
@@ -31,15 +33,17 @@ class PermissionsSeeder extends Seeder
             'inventory.proyektor.import','inventory.proyektor.export',
             'inventory.ac.import','inventory.ac.export',
             'inventory.hardware.import','inventory.hardware.export',
+            'inventory.labkom.import','inventory.labkom.export',
         ];
 
-        // Manajemen kolom per aset (bisa dipecah add/rename/drop kalau mau)
+        // Manajemen kolom per aset
         $perEntityColumns = [
             'inventory.pc.columns',
             'inventory.printer.columns',
             'inventory.proyektor.columns',
             'inventory.ac.columns',
             'inventory.hardware.columns',
+            'inventory.labkom.columns',
         ];
 
         // Dashboard
@@ -48,21 +52,22 @@ class PermissionsSeeder extends Seeder
             'dashboard.view.kpi', 'dashboard.view.chart',
         ];
 
+        // Buat semua permission
         foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms) as $name) {
-            Permission::firstOrCreate(['name' => $name]);
+            Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
-        $admin = Role::firstOrCreate(['name' => 'admin']);
-        $user  = Role::firstOrCreate(['name' => 'user']);
+        // Roles
+        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        $user  = Role::firstOrCreate(['name' => 'user',  'guard_name' => 'web']);
 
         // Admin dapat semua
         $admin->syncPermissions(Permission::all());
 
-        // USER DEFAULT: tidak punya akses inventory sama sekali.
-        // Hanya boleh melihat dashboard basic (opsional: hapus 'dashboard.view' jika mau nol akses total).
+        // USER DEFAULT: hanya dashboard basic (ubah sesuai kebijakan)
         $userDefaultPerms = [
             'dashboard.view',
-            // Kalau mau user baru juga bisa lihat lokasi rawan, tinggal tambahkan:
+            // Jika ingin user baru juga bisa lihat lokasi rawan, tambahkan:
             // 'dashboard.view.lokasi-rawan',
         ];
         $user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());

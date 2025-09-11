@@ -144,6 +144,22 @@
           </div>
         </div>
 
+        {{-- Labkom --}}
+        <div class="rounded-lg border p-4">
+          <div class="font-semibold mb-2">Labkom</div>
+          <div class="grid gap-2 mb-3">
+            {!! $cb('inventory.labkom.view',   "inventory.labkom.view ({$LBL['view']})") !!}
+            {!! $cb('inventory.labkom.create', "inventory.labkom.create ({$LBL['create']})") !!}
+            {!! $cb('inventory.labkom.edit',   "inventory.labkom.edit ({$LBL['edit']})") !!}
+            {!! $cb('inventory.labkom.delete', "inventory.labkom.delete ({$LBL['delete']})") !!}
+          </div>
+          <div class="mt-2 grid gap-2 border-t pt-3">
+            {!! $cb('inventory.labkom.import',  'inventory.labkom.import (Impor CSV/Template)') !!}
+            {!! $cb('inventory.labkom.export',  'inventory.labkom.export (Ekspor CSV)') !!}
+            {!! $cb('inventory.labkom.columns', 'inventory.labkom.columns (Kelola kolom)') !!}
+          </div>
+        </div>
+        
       </div>
     </fieldset>
 

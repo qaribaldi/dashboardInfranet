@@ -16,9 +16,10 @@
     $canProyektor = $u?->can('inventory.proyektor.view');
     $canAc        = $u?->can('inventory.ac.view');
     $canHardware  = $u?->can('inventory.hardware.view');
+    $canLabkom    = $u?->can('inventory.labkom.view');   
 
-    $canAnyAsset  = $canPc || $canPrinter || $canProyektor || $canAc;  // grup "Inventory Aset"
-    $canAnyInv    = $canAnyAsset || $canHardware;                      // show/hidden keseluruhan Inventory
+    $canAnyAsset  = $canPc || $canPrinter || $canProyektor || $canAc; 
+    $canAnyInv    = $canAnyAsset || $canHardware || $canLabkom;      
 
     // Active states
     $isDash   = request()->routeIs('dashboard');
@@ -30,10 +31,11 @@
                        || request()->routeIs('inventory.ac.*');
 
     $isHardwareActive = request()->routeIs('inventory.hardware.*');
+    $isLabkomActive   = request()->routeIs('inventory.labkom.*');      
   @endphp
 
   <nav class="p-3">
-    {{-- DASHBOARD (opsional: batasi tampilan dengan permission) --}}
+    {{-- DASHBOARD --}}
     @can('dashboard.view')
       <div class="space-y-1">
         <a href="{{ route('dashboard') }}"
@@ -47,7 +49,6 @@
       </div>
     @endcan
 
-    {{-- SPACER --}}
     <div class="mt-6"></div>
 
     {{-- INVENTORY (collapsible) --}}
@@ -61,7 +62,6 @@
             </svg>
             <span>Inventory</span>
           </span>
-          {{-- chevron --}}
           <svg class="h-4 w-4 transition-transform duration-200 {{ $isInvGrp ? 'rotate-90' : 'rotate-0' }}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M9 5l7 7-7 7"/>
           </svg>
@@ -87,6 +87,16 @@
                       {{ $isHardwareActive ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
                                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-gray-700/70' }}">
               Inventory Hardware
+            </a>
+          @endif
+
+          {{-- Inventory Labkom --}}
+          @if($canLabkom)
+            <a href="{{ route('inventory.labkom.index') }}"
+               class="px-3 py-2 rounded-lg text-sm
+                      {{ $isLabkomActive ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                         : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-gray-700/70' }}">
+              Inventory Labkom
             </a>
           @endif
 

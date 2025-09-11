@@ -48,7 +48,6 @@
 
         <div class="flex items-end gap-2">
           <div>
-            <label class="block text-sm font-medium mb-1">Cari</label>
             <input type="text" name="q" value="{{ $q }}" placeholder="Cari…"
                    class="w-56 rounded-lg border border-gray-300 px-3 py-2" />
           </div>
