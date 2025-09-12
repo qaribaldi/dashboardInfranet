@@ -6,19 +6,8 @@
 
     <div class="flex items-center gap-3">
       @php
-        $JENIS_LIST = [
-          'processor'       => 'Processor',
-          'ram'             => 'RAM',
-          'storage'         => 'Storage',
-          'vga'             => 'VGA',
-          'monitor'         => 'Monitor',
-          'motherboard'     => 'Motherboard',
-          'fan_processor'   => 'Fan Processor',
-          'network_adapter' => 'Network Adapter',
-          'power_supply'    => 'Power Supply',
-          'keyboard'        => 'Keyboard',
-          'mouse'           => 'Mouse',
-        ];
+        // ambil dari controller
+        $listJenis    = $jenisList ?? [];
         $jenis        = request('jenis', '');
         $storage_type = request('storage_type', '');
         $q            = request('q', '');
@@ -31,8 +20,10 @@
           <label class="block text-sm font-medium mb-1">Jenis Hardware</label>
           <select name="jenis" id="jenisSelect" class="rounded-lg border border-gray-300 px-3 py-2">
             <option value="">Semua</option>
-            @foreach($JENIS_LIST as $val => $label)
-              <option value="{{ $val }}" {{ $jenis === $val ? 'selected' : '' }}>{{ $label }}</option>
+            @foreach($listJenis as $val)
+              <option value="{{ $val }}" {{ $jenis === $val ? 'selected' : '' }}>
+                {{ ucwords(str_replace('_',' ', $val)) }}
+              </option>
             @endforeach
           </select>
         </div>
@@ -111,9 +102,17 @@
           <tr class="border-t">
             {{-- kolom dinamis dari tabel master --}}
             @foreach($cols as $c)
-              <td class="px-4 py-2">{{ data_get($row, $c) ?? '—' }}</td>
-            @endforeach
+              <td class="px-4 py-2">
+                @php $val = data_get($row, $c); @endphp
 
+                {{-- tampilkan tanggal saja untuk kolom tanggal_pembelian (tanpa jam) --}}
+                @if($c === 'tanggal_pembelian' && !empty($val))
+                  {{ \Illuminate\Support\Carbon::parse($val)->format('Y-m-d') }}
+                @else
+                  {{ $val ?? '—' }}
+                @endif
+              </td>
+            @endforeach
 
             {{-- Daftar PC terpasang (dari pivot) --}}
             <td class="px-4 py-2">

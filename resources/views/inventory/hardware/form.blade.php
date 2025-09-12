@@ -23,21 +23,44 @@
       </div>
       @endif
 
-      {{-- Jenis Hardware --}}
-      @if(array_key_exists('jenis_hardware',$fields))
-      <div>
-        <label class="block text-sm font-medium mb-1" for="jenis_hardware">Jenis Hardware</label>
-        <select id="jenis_hardware" name="jenis_hardware" class="w-full rounded-lg border border-gray-300 px-3 py-2">
-          <option value="">— pilih —</option>
-          @foreach($jenisList as $j)
-            <option value="{{ $j }}" {{ old('jenis_hardware', $data->jenis_hardware)===$j ? 'selected' : '' }}>
-              {{ ucwords(str_replace('_',' ',$j)) }}
-            </option>
-          @endforeach
-        </select>
-        @error('jenis_hardware') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
-      </div>
-      @endif
+      {{-- Jenis Hardware: pilih dari dropdown ATAU input manual --}}
+@if(array_key_exists('jenis_hardware',$fields))
+  @php
+    $oldManual = old('jenis_hardware_manual', '');
+    $oldSelect = old('jenis_hardware_select', $data->jenis_hardware);
+    $useManual = $oldManual !== '';
+  @endphp
+  <div>
+    <label class="block text-sm font-medium mb-1">Jenis Hardware</label>
+
+    {{-- Dropdown (name berbeda) --}}
+    <select id="jenis_hardware_select" name="jenis_hardware_select"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 {{ $useManual ? 'hidden' : '' }}">
+      <option value="">— pilih —</option>
+      @foreach(($jenisList ?? []) as $j)
+        <option value="{{ $j }}" {{ $oldSelect===$j ? 'selected' : '' }}>
+          {{ ucwords(str_replace('_',' ', $j)) }}
+        </option>
+      @endforeach
+    </select>
+
+    {{-- Input manual (hidden by default) --}}
+    <input id="jenis_hardware_manual" name="jenis_hardware_manual"
+           value="{{ $oldManual }}"
+           placeholder="Tulis jenis baru…"
+           class="w-full rounded-lg border border-gray-300 px-3 py-2 {{ $useManual ? '' : 'hidden' }}" />
+
+    <div class="mt-2 text-xs text-gray-600">
+      <button type="button" id="btnJenisManual" class="underline">
+        {{ $useManual ? '← Pakai dropdown saja' : '+ Input manual' }}
+      </button>
+    </div>
+
+    @error('jenis_hardware_select') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+    @error('jenis_hardware_manual') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+  </div>
+@endif
+
 
       {{-- Storage Type (khusus storage) --}}
       @if(array_key_exists('storage_type',$fields))
@@ -213,110 +236,125 @@
   <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
 
   <script>
-    const jenisEl       = document.getElementById('jenis_hardware');
-    const storageWrap   = document.getElementById('field_storage_type');
-    const storageSelect = document.getElementById('storage_type');
+    const jenisSelect   = document.getElementById('jenis_hardware_select');
+  const jenisManual   = document.getElementById('jenis_hardware_manual');
+  const btnJenisMan   = document.getElementById('btnJenisManual');
 
-    const statusEl      = document.getElementById('status');
-    const usedDateWrap  = document.getElementById('field_tanggal_digunakan');
-    const usedDateInput = document.getElementById('tanggal_digunakan');
-    const pcsWrap       = document.getElementById('field_pcs');
-    const pcsSelect     = document.getElementById('pcs');
+  const storageWrap   = document.getElementById('field_storage_type');
+  const storageSelect = document.getElementById('storage_type');
 
-    const stokInput     = document.getElementById('jumlah_stock');
-    const stockPreview  = document.getElementById('stock_preview');
-    const formEl        = document.querySelector('form[method="POST"]');
-    const mode          = formEl?.dataset?.mode || 'create';
-    const initialSelCnt = parseInt(formEl?.dataset?.initialSelectedCount || '0', 10);
+  const statusEl      = document.getElementById('status');
+  const usedDateWrap  = document.getElementById('field_tanggal_digunakan');
+  const usedDateInput = document.getElementById('tanggal_digunakan');
+  const pcsWrap       = document.getElementById('field_pcs');
+  const pcsSelect     = document.getElementById('pcs');
+
+  const stokInput     = document.getElementById('jumlah_stock');
+  const stockPreview  = document.getElementById('stock_preview');
+  const formEl        = document.querySelector('form[method="POST"]');
+  const mode          = formEl?.dataset?.mode || 'create';
+  const initialSelCnt = parseInt(formEl?.dataset?.initialSelectedCount || '0', 10);
 
     let choicesInstance = null;
 
     function setHidden(el, hidden, inputEl = null, required = false) {
-      if (!el) return;
-      el.classList.toggle('hidden', hidden);
-      if (inputEl) {
-        inputEl.disabled = hidden;
-        inputEl.required = !hidden && required;
-      }
+    if (!el) return;
+    el.classList.toggle('hidden', hidden);
+    if (inputEl) {
+      inputEl.disabled = hidden;
+      inputEl.required = !hidden && required;
     }
+  }
 
-    function onJenisChange() {
-      const isStorage = (jenisEl?.value === 'storage');
-      setHidden(storageWrap, !isStorage, storageSelect, true);
-      if (!isStorage && storageSelect) storageSelect.value = '';
-    }
+  function currentJenis() {
+    const m = (jenisManual && !jenisManual.classList.contains('hidden')) ? jenisManual.value : '';
+    if (m && m.trim() !== '') return m.trim().toLowerCase();
+    const s = jenisSelect ? (jenisSelect.value || '').toLowerCase() : '';
+    return s;
+  }
 
-    function onStatusChange() {
-      const inUse = (statusEl?.value === 'In use');
-      setHidden(usedDateWrap, !inUse, usedDateInput, false);
-      setHidden(pcsWrap,      !inUse, pcsSelect,     false);
-      if (!inUse && choicesInstance) {
-        // Tidak menghapus pilihan; controller akan mengabaikan jika bukan In use.
-      }
-      updateStockPreview();
-    }
+  function onJenisChange() {
+    const isStorage = (currentJenis() === 'storage');
+    setHidden(storageWrap, !isStorage, storageSelect, true);
+    if (!isStorage && storageSelect) storageSelect.value = '';
+  }
 
-    function initChoices() {
-      if (!pcsSelect) return;
-      choicesInstance = new Choices(pcsSelect, {
-        removeItemButton: true,
-        placeholder: true,
-        placeholderValue: 'Pilih satu atau lebih PC…',
-        searchPlaceholderValue: 'Cari PC…',
-        shouldSort: false,
-        itemSelectText: '',
-      });
-      pcsSelect.addEventListener('change', updateStockPreview);
-    }
+  // toggle dropdown <-> manual
+  btnJenisMan?.addEventListener('click', () => {
+    const useManual = jenisManual.classList.contains('hidden');
+    setHidden(jenisSelect,  useManual === true ? true  : false);
+    setHidden(jenisManual,  useManual === true ? false : true);
+    btnJenisMan.textContent = useManual ? '← Pakai dropdown saja' : '+ Input manual';
+    onJenisChange();
+  });
 
-    function getSelectedCount() {
-      if (!pcsSelect) return 0;
-      // Saat sudah diinisialisasi Choices, <select> tetap sinkron dengan value terpilih
-      return Array.from(pcsSelect.selectedOptions || []).length;
-    }
+      function onStatusChange() {
+    const inUse = (statusEl?.value === 'In use');
+    setHidden(usedDateWrap, !inUse, usedDateInput, false);
+    setHidden(pcsWrap,      !inUse, pcsSelect,     false);
+    updateStockPreview();
+  }
 
-    function updateStockPreview() {
-      if (!stockPreview) return;
-
-      const inUse = (statusEl?.value === 'In use');
-      const selected = getSelectedCount();
-
-      if (mode === 'create') {
-        const stokAwal = parseInt(stokInput?.value || '0', 10);
-        if (inUse && stokInput) {
-          const final = stokAwal - selected;
-          stockPreview.textContent =
-            `Perkiraan stok akhir: ${final} (stok awal ${stokAwal} − ${selected} PC dipilih)`;
-          stockPreview.className =
-            'text-xs mt-1 ' + (final < 0 ? 'text-red-600' : 'text-gray-600');
-        } else {
-          stockPreview.textContent = '';
-        }
-      } else {
-        // edit: preview berdasarkan selisih (added - removed)
-        const delta = selected - initialSelCnt;
-        if (inUse) {
-          const now = parseInt(stokInput?.value || '0', 10);
-          const final = now - Math.max(delta, 0) + Math.max(-delta, 0); // tampilkan ilustrasi saja
-          const sign = (delta > 0 ? `− ${delta}` : delta < 0 ? `+ ${-delta}` : '± 0');
-          stockPreview.textContent =
-            `Stok akan disesuaikan: ${sign} unit (berdasarkan perubahan pilihan PC).`;
-          stockPreview.className = 'text-xs mt-1 text-gray-600';
-        } else {
-          stockPreview.textContent = '';
-        }
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      onJenisChange();
-      onStatusChange();
-      initChoices();
-      updateStockPreview();
-
-      jenisEl?.addEventListener('change', onJenisChange);
-      statusEl?.addEventListener('change', onStatusChange);
-      stokInput?.addEventListener('input', updateStockPreview);
+  function initChoices() {
+    if (!pcsSelect) return;
+    choicesInstance = new Choices(pcsSelect, {
+      removeItemButton: true,
+      placeholder: true,
+      placeholderValue: 'Pilih satu atau lebih PC…',
+      searchPlaceholderValue: 'Cari PC…',
+      shouldSort: false,
+      itemSelectText: '',
     });
-  </script>
+    pcsSelect.addEventListener('change', updateStockPreview);
+  }
+
+  function getSelectedCount() {
+    if (!pcsSelect) return 0;
+    return Array.from(pcsSelect.selectedOptions || []).length;
+  }
+
+  function updateStockPreview() {
+    if (!stockPreview) return;
+    const inUse = (statusEl?.value === 'In use');
+    const selected = getSelectedCount();
+
+    if (mode === 'create') {
+      const stokAwal = parseInt(stokInput?.value || '0', 10);
+      if (inUse && stokInput) {
+        const final = stokAwal - selected;
+        stockPreview.textContent =
+          `Perkiraan stok akhir: ${final} (stok awal ${stokAwal} − ${selected} PC dipilih)`;
+        stockPreview.className =
+          'text-xs mt-1 ' + (final < 0 ? 'text-red-600' : 'text-gray-600');
+      } else {
+        stockPreview.textContent = '';
+      }
+    } else {
+      const delta = selected - initialSelCnt;
+      if (inUse) {
+        const now = parseInt(stokInput?.value || '0', 10);
+        const final = now - Math.max(delta, 0) + Math.max(-delta, 0);
+        const sign = (delta > 0 ? `− ${delta}` : delta < 0 ? `+ ${-delta}` : '± 0');
+        stockPreview.textContent =
+          `Stok akan disesuaikan: ${sign} unit (berdasarkan perubahan pilihan PC).`;
+        stockPreview.className = 'text-xs mt-1 text-gray-600';
+      } else {
+        stockPreview.textContent = '';
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    onJenisChange();
+    onStatusChange();
+    initChoices();
+    updateStockPreview();
+
+    jenisSelect?.addEventListener('change', onJenisChange);
+    jenisManual?.addEventListener('input', onJenisChange);
+    statusEl?.addEventListener('change', onStatusChange);
+    stokInput?.addEventListener('input', updateStockPreview);
+  });
+</script>
+
 @endsection

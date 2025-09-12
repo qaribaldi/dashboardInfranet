@@ -40,6 +40,40 @@ class InventoryHardwareController extends Controller
         'datetime' => 'dateTime',
     ];
 
+    /** Ambil daftar jenis unik dari DB untuk dropdown/filter */
+    private function getJenisList(): array
+    {
+        return DB::table($this->table)
+            ->whereNotNull('jenis_hardware')
+            ->where('jenis_hardware','<>','')
+            ->distinct()
+            ->orderBy('jenis_hardware')
+            ->pluck('jenis_hardware')
+            ->all();
+    }
+
+    /** Gabungkan opsi default + unik dari DB, tanpa duplikat */
+private function jenisOptions(): array
+{
+    $fromDb = DB::table($this->table)
+        ->whereNotNull('jenis_hardware')
+        ->where('jenis_hardware','<>','')
+        ->distinct()
+        ->orderBy('jenis_hardware')
+        ->pluck('jenis_hardware')
+        ->all();
+
+    // self::JENIS = daftar default bawaan (opsional)
+    $all = array_merge(self::JENIS, $fromDb);
+
+    // unik + urut alfabet
+    $all = array_values(array_unique($all));
+    sort($all, SORT_STRING);
+
+    return $all;
+}
+
+
     /** Normalisasi nama kolom */
     private function normalize(string $name): string
     {
@@ -184,8 +218,8 @@ class InventoryHardwareController extends Controller
         }
 
         $items = $base->with(['pcs' => fn($q) => $q->select('asset_pc.id_pc')])->orderBy('id_hardware')->paginate(12)->appends($req->query());
-
-        return view('inventory.hardware.index', compact('items'));
+        $jenisList = $this->getJenisList();
+        return view('inventory.hardware.index', compact('items','jenisList'));
     }
 
     private function columnKinds(string $table): array
@@ -217,33 +251,43 @@ class InventoryHardwareController extends Controller
 
     // ================= FORM =================
     public function create()
-    {
-        $columns = Schema::getColumnListing($this->table);
-        $skip = ['created_at','updated_at','specs'];
-        $fields = [];
-        foreach ($columns as $col) {
-            if (in_array($col,$skip)) continue;
-            $fields[$col] = ucwords(str_replace('_',' ',$col));
-        }
-
-        $statusOptions = config('inventory.status_options');
-        $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc'); // untuk multi-select
-        $kinds = $this->columnKinds($this->table);
-
-        return view('inventory.hardware.form', [
-            'mode'          => 'create',
-            'fields'        => $fields,
-            'data'          => new InventoryHardware(),
-            'jenisList'     => self::JENIS,
-            'storageTypes'  => self::STORAGE_TYPES,
-            'statusOptions' => $statusOptions,
-            'pcIds'         => $pcIds,
-            'selectedPcs'   => [], // multi-select (create)
-        ]+ $kinds);
+{
+    $columns = Schema::getColumnListing($this->table);
+    $skip = ['created_at','updated_at','specs'];
+    $fields = [];
+    foreach ($columns as $col) {
+        if (in_array($col,$skip)) continue;
+        $fields[$col] = ucwords(str_replace('_',' ',$col));
     }
+
+    $statusOptions = config('inventory.status_options');
+    $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc');
+    $kinds = $this->columnKinds($this->table);
+
+    return view('inventory.hardware.form', [
+        'mode'          => 'create',
+        'fields'        => $fields,
+        'data'          => new InventoryHardware(),
+        'jenisList'     => $this->jenisOptions(),   // ← ganti ini
+        'storageTypes'  => self::STORAGE_TYPES,
+        'statusOptions' => $statusOptions,
+        'pcIds'         => $pcIds,
+        'selectedPcs'   => [],
+    ] + $kinds);
+}
+
 
     public function store(Request $req)
 {
+    // Ambil nilai dari select ATAU manual
+    $jenisEfektif = trim((string)($req->input('jenis_hardware_manual') ?: $req->input('jenis_hardware_select')));
+    if ($jenisEfektif === '') {
+        return back()->withErrors(['jenis_hardware_select' => 'Pilih dari dropdown atau isi manual.'])->withInput();
+    }
+
+    // Merge supaya validator melihat field 'jenis_hardware'
+    $req->merge(['jenis_hardware' => $jenisEfektif]);
+
     $data = $req->validate([
         'id_hardware'        => 'required|string|unique:inventory_hardware,id_hardware',
         'jenis_hardware'     => 'required|string',
@@ -251,13 +295,14 @@ class InventoryHardwareController extends Controller
         'vendor'             => 'nullable|string',
         'jumlah_stock'       => 'required|integer|min:0',
         'status'             => 'nullable|string|in:In use,In store,Service,available',
+        // kalau mau dipaksa wajib saat jenis=storage, ganti ke: 'required_if:jenis_hardware,storage|in:ssd,hdd'
         'storage_type'       => 'nullable|in:ssd,hdd',
         'pcs'                => 'nullable|array',
         'pcs.*'              => 'string|max:5|distinct|exists:asset_pc,id_pc',
         'tanggal_digunakan'  => 'nullable|date',
     ]);
 
-    if (($data['jenis_hardware'] ?? '') !== 'storage') {
+    if ($data['jenis_hardware'] !== 'storage') {
         $data['storage_type'] = null;
     }
 
@@ -265,24 +310,20 @@ class InventoryHardwareController extends Controller
         $selectedPcs = array_values(array_unique($data['pcs'] ?? []));
         $nSelected   = count($selectedPcs);
 
-        // Stok awal harus cukup jika memilih PC saat create
         if ($nSelected > 0 && $data['jumlah_stock'] < $nSelected) {
             abort(422, "Stok tidak cukup. Memilih {$nSelected} PC membutuhkan stok minimal {$nSelected}.");
         }
 
-        // 1) Simpan master
         $hw = InventoryHardware::create([
             'id_hardware'       => $data['id_hardware'],
             'jenis_hardware'    => $data['jenis_hardware'],
             'tanggal_pembelian' => $data['tanggal_pembelian'] ?? null,
             'vendor'            => $data['vendor'] ?? null,
-            // KURANGI stok sesuai jumlah PC terpilih
             'jumlah_stock'      => $data['jumlah_stock'] - $nSelected,
             'status'            => $data['status'] ?? 'available',
             'storage_type'      => $data['storage_type'] ?? null,
         ]);
 
-        // 2) Attach PC + tanggal
         if ($nSelected > 0) {
             $tanggal = $data['tanggal_digunakan'] ?? null;
             $attach  = [];
@@ -296,51 +337,58 @@ class InventoryHardwareController extends Controller
     return redirect()->route('inventory.hardware.index')->with('success','Hardware ditambahkan.');
 }
 
-
-    public function edit(InventoryHardware $hardware)
-    {
-        $columns = Schema::getColumnListing($this->table);
-        $skip = ['created_at','updated_at','specs'];
-        $fields = [];
-        foreach ($columns as $col) {
-            if (in_array($col,$skip)) continue;
-            $fields[$col] = ucwords(str_replace('_',' ',$col));
-        }
-
-        $statusOptions = config('inventory.status_options');
-        $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc');
-        $kinds = $this->columnKinds($this->table);
-
-        $selectedPcs = $hardware->pcs()->pluck('asset_pc.id_pc')->all();
-
-        return view('inventory.hardware.form', [
-            'mode'          => 'edit',
-            'fields'        => $fields,
-            'data'          => $hardware->load('pcs'),
-            'jenisList'     => self::JENIS,
-            'storageTypes'  => self::STORAGE_TYPES,
-            'statusOptions' => $statusOptions,
-            'pcIds'         => $pcIds,
-            'selectedPcs'   => $selectedPcs,
-        ]+ $kinds);
+   public function edit(InventoryHardware $hardware)
+{
+    $columns = Schema::getColumnListing($this->table);
+    $skip = ['created_at','updated_at','specs'];
+    $fields = [];
+    foreach ($columns as $col) {
+        if (in_array($col,$skip)) continue;
+        $fields[$col] = ucwords(str_replace('_',' ',$col));
     }
+
+    $statusOptions = config('inventory.status_options');
+    $pcIds = AssetPc::orderBy('id_pc')->pluck('id_pc');
+    $kinds = $this->columnKinds($this->table);
+
+    $selectedPcs = $hardware->pcs()->pluck('asset_pc.id_pc')->all();
+
+    return view('inventory.hardware.form', [
+        'mode'          => 'edit',
+        'fields'        => $fields,
+        'data'          => $hardware->load('pcs'),
+        'jenisList'     => $this->jenisOptions(),   // ← ganti ini
+        'storageTypes'  => self::STORAGE_TYPES,
+        'statusOptions' => $statusOptions,
+        'pcIds'         => $pcIds,
+        'selectedPcs'   => $selectedPcs,
+    ] + $kinds);
+}
 
     public function update(Request $req, InventoryHardware $hardware)
 {
+    $jenisEfektif = trim((string)($req->input('jenis_hardware_manual') ?: $req->input('jenis_hardware_select')));
+    if ($jenisEfektif === '') {
+        return back()->withErrors(['jenis_hardware_select' => 'Pilih dari dropdown atau isi manual.'])->withInput();
+    }
+
+    // Merge ke 'jenis_hardware' agar validasi & logika di bawah konsisten
+    $req->merge(['jenis_hardware' => $jenisEfektif]);
+
     $data = $req->validate([
         'id_hardware'        => 'required|string|unique:inventory_hardware,id_hardware,'.$hardware->id_hardware.',id_hardware',
         'jenis_hardware'     => 'required|string',
         'tanggal_pembelian'  => 'nullable|date',
         'vendor'             => 'nullable|string',
-        // 'jumlah_stock'     => 'required|integer|min:0', // ← ABAIKAN di edit
         'status'             => 'nullable|string|in:In use,In store,Service,available',
+        // kalau mau wajib saat storage: 'required_if:jenis_hardware,storage|in:ssd,hdd'
         'storage_type'       => 'nullable|in:ssd,hdd',
         'pcs'                => 'nullable|array',
         'pcs.*'              => 'string|max:5|distinct|exists:asset_pc,id_pc',
         'tanggal_digunakan'  => 'nullable|date',
     ]);
 
-    if (($data['jenis_hardware'] ?? '') !== 'storage') {
+    if ($data['jenis_hardware'] !== 'storage') {
         $data['storage_type'] = null;
     }
 
@@ -351,13 +399,11 @@ class InventoryHardwareController extends Controller
         $added   = array_values(array_diff($new, $old));
         $removed = array_values(array_diff($old, $new));
 
-        // stok final = stok sekarang - added + removed
         $finalStock = $hardware->jumlah_stock - count($added) + count($removed);
         if ($finalStock < 0) {
             abort(422, "Stok tidak mencukupi. Penambahan alokasi membutuhkan ".count($added)." unit.");
         }
 
-        // Update master TANPA menyentuh jumlah_stock dari input
         $hardware->update([
             'id_hardware'       => $data['id_hardware'],
             'jenis_hardware'    => $data['jenis_hardware'],
@@ -367,10 +413,8 @@ class InventoryHardwareController extends Controller
             'storage_type'      => $data['storage_type'] ?? null,
         ]);
 
-        // Sinkronisasi pivot
-        if (!empty($removed)) {
-            $hardware->pcs()->detach($removed);
-        }
+        if (!empty($removed)) $hardware->pcs()->detach($removed);
+
         if (!empty($added)) {
             $tanggal = $data['tanggal_digunakan'] ?? null;
             $attach  = [];
@@ -380,12 +424,12 @@ class InventoryHardwareController extends Controller
             $hardware->pcs()->attach($attach);
         }
 
-        // Set stok final
         $hardware->update(['jumlah_stock' => $finalStock]);
     });
 
     return redirect()->route('inventory.hardware.index')->with('success','Hardware diperbarui.');
 }
+
 
     public function destroy(InventoryHardware $hardware)
     {
