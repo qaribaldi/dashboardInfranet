@@ -37,7 +37,7 @@
       @can('inventory.ac.create')
         <a href="{{ route('inventory.ac.create') }}"
            class="inline-flex items-center rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">+ Tambah</a>
-      @endcan>
+      @endcan
 
       @can('inventory.ac.import')
         <a href="{{ route('inventory.ac.importForm') }}"

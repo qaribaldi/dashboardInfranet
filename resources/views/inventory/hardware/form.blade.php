@@ -50,7 +50,7 @@
            placeholder="Tulis jenis baru…"
            class="w-full rounded-lg border border-gray-300 px-3 py-2 {{ $useManual ? '' : 'hidden' }}" />
 
-    <div class="mt-2 text-xs text-gray-600">
+    <div class="mt-2 text-xs text-gray-600 text-bold">
       <button type="button" id="btnJenisManual" class="underline">
         {{ $useManual ? '← Pakai dropdown saja' : '+ Input manual' }}
       </button>
@@ -169,9 +169,6 @@
             <option value="{{ $pid }}" {{ in_array($pid, $selected, true) ? 'selected' : '' }}>{{ $pid }}</option>
           @endforeach
         </select>
-        <p class="text-xs text-gray-500 mt-1">
-          Klik untuk memilih; item terpilih akan muncul sebagai chip (tanpa perlu tahan Shift/Ctrl).
-        </p>
         @error('pcs') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
         @error('pcs.*') <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
       </div>
@@ -216,12 +213,12 @@
       @endforeach
     </div>
 
-    <div>
+    <!-- <div>
       <label for="catatan_histori" class="block text-sm font-medium mb-1">Catatan Histori</label>
       <textarea id="catatan_histori" name="catatan_histori"
         class="w-full rounded-lg border border-gray-300 px-3 py-2" rows="3"
         placeholder="Misal: dipasang ke PC-001, ganti SSD, klaim garansi, dll.">{{ old('catatan_histori') }}</textarea>
-    </div>
+    </div> -->
 
     <div class="flex items-center gap-3">
       <button class="rounded-lg bg-blue-600 text-white px-4 py-2 hover:bg-blue-700">

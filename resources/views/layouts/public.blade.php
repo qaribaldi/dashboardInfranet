@@ -14,9 +14,12 @@
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
   </head>
-<body class="antialiased bg-gray-50 text-gray-900 overflow-x-hidden">
+  <body class="antialiased bg-gray-50 text-gray-900 overflow-x-hidden">
     <div class="min-h-screen flex flex-col">
       @yield('content')
     </div>
-</body>
+
+    {{-- scripts yang dipush dari view (mis. landing) --}}
+    @stack('body-end')
+  </body>
 </html>

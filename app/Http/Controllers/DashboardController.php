@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Models\AssetPc;
 use App\Models\AssetPrinter;
 use App\Models\AssetProyektor;
 use App\Models\AssetAc;
 use App\Models\AssetHistory;
+use App\Models\InventoryLabkom; // Labkom
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -31,6 +33,11 @@ class DashboardController extends Controller
         $nowJakarta  = now('Asia/Jakarta');
         $currentYear = (int) $nowJakarta->year;
 
+        // === PARAMETER (khusus PC biasa) ===
+        $pcRamLow      = (bool) $request->boolean('pc_ram_low', false);
+        $pcHddOnly     = (bool) $request->boolean('pc_hdd_only', false);
+        $ramThreshold  = (int)  $request->integer('pc_ram_threshold', 8); // default 8 GB
+
         // === BUCKET UMUR ===
         $selected  = (int) $request->integer('min_age', 5);
         $bucketMap = [
@@ -53,19 +60,40 @@ class DashboardController extends Controller
             }
         };
 
-        // Totals
-        $totalPc        = AssetPc::count();
+        // ===== Totals (PC gabungan: AssetPc + InventoryLabkom) =====
+        $totalPcNonLab   = AssetPc::count();
+        $totalPcLabkom   = InventoryLabkom::count();
+        $totalPcCombined = $totalPcNonLab + $totalPcLabkom;
+
+        // Labkom unik (berdasarkan nama_lab)
+        $totalLabkom = InventoryLabkom::whereNotNull('nama_lab')
+            ->distinct('nama_lab')
+            ->count('nama_lab');
+
         $totalPrinter   = AssetPrinter::count();
         $totalProyektor = AssetProyektor::count();
         $totalAc        = AssetAc::count();
 
-        // Old per bucket
-        $oldPc        = $applyYearRange(AssetPc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
+        
+
+        // Old per bucket (gabungan untuk PC)
+        $oldPcNonLab = $applyYearRange(AssetPc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
+        $oldPcLabkom = $applyYearRange(InventoryLabkom::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
+        $oldPc       = $oldPcNonLab + $oldPcLabkom;
+
+        // Old Labkom: hitung DISTINCT nama_lab di rentang umur
+        $oldLabkom = $applyYearRange(
+        InventoryLabkom::whereNotNull('tahun_pembelian')->whereNotNull('nama_lab'),
+        'tahun_pembelian'
+        )
+        ->distinct('nama_lab')
+        ->count('nama_lab');
+
         $oldPrinter   = $applyYearRange(AssetPrinter::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
         $oldProyektor = $applyYearRange(AssetProyektor::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
         $oldAc        = $applyYearRange(AssetAc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
 
-        // Bar chart 8 tahun
+        // Bar chart 8 tahun (tren pengadaan)
         $years = [];
         for ($y = $currentYear - 7; $y <= $currentYear; $y++) $years[] = $y;
 
@@ -88,95 +116,154 @@ class DashboardController extends Controller
             ],
         ];
 
-        // Pie chart
+        // Pie chart — PC = PC biasa + PC Labkom (gabungan)
         $pie = [
             'labels' => ['PC','Printer','Proyektor','AC'],
-            'data'   => [$totalPc, $totalPrinter, $totalProyektor, $totalAc],
+            'data'   => [$totalPcCombined, $totalPrinter, $totalProyektor, $totalAc],
         ];
 
-        // Kandidat upgrade (by bucket)
-        $upgradeList = [
-            'pc' => $applyYearRange(
-                        AssetPc::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
-                        'tahun_pembelian'
-                    )
-                    ->get(['id_pc as id','unit_kerja','ruang','merk','processor','total_kapasitas_ram as ram','tahun_pembelian'])
-                    ->map(fn($r)=>[
-                        'type'            => 'PC',
-                        'id'              => $r->id,
-                        'unit_kerja'      => $r->unit_kerja,
-                        'ruang'           => $r->ruang,
-                        'spes'            => "{$r->merk} / {$r->processor}",
-                        'processor'       => $r->processor,
-                        'ram'             => $r->ram,
-                        'status_warna'    => null,
-                        'resolusi_max'    => null,
-                        'tahun_pembelian' => $r->tahun_pembelian,
-                        'umur'            => $currentYear - (int)$r->tahun_pembelian,
-                    ]),
-            'printer' => $applyYearRange(
-                            AssetPrinter::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
-                            'tahun_pembelian'
-                        )
-                        ->get(['id_printer as id','unit_kerja','ruang','merk','tipe','status_warna','tahun_pembelian'])
-                        ->map(fn($r)=>[
-                            'type'            => 'Printer',
-                            'id'              => $r->id,
-                            'unit_kerja'      => $r->unit_kerja,
-                            'ruang'           => $r->ruang,
-                            'spes'            => "{$r->merk} / {$r->tipe}",
-                            'processor'       => null,
-                            'ram'             => null,
-                            'status_warna'    => $r->status_warna,
-                            'resolusi_max'    => null,
-                            'tahun_pembelian' => $r->tahun_pembelian,
-                            'umur'            => $currentYear - (int)$r->tahun_pembelian,
-                        ]),
-            'proyektor' => $applyYearRange(
-                            AssetProyektor::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
-                            'tahun_pembelian'
-                        )
-                        ->get(['id_proyektor as id','nama_ruang','ruang','merk','tipe_proyektor','resolusi_max','tahun_pembelian'])
-                        ->map(fn($r)=>[
-                            'type'            => 'Proyektor',
-                            'id'              => $r->id,
-                            'unit_kerja'      => $r->nama_ruang,
-                            'ruang'           => $r->ruang,
-                            'spes'            => "{$r->merk} / {$r->tipe_proyektor}",
-                            'processor'       => null,
-                            'ram'             => null,
-                            'status_warna'    => null,
-                            'resolusi_max'    => $r->resolusi_max,
-                            'tahun_pembelian' => $r->tahun_pembelian,
-                            'umur'            => $currentYear - (int)$r->tahun_pembelian,
-                        ]),
-            'ac' => $applyYearRange(
-                        AssetAc::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
-                        'tahun_pembelian'
-                    )
-                    ->get(['id_ac as id','unit_kerja','ruang','merk','tipe_asset','ukuran_pk','kondisi','remote','tahun_pembelian'])
-                    ->map(fn($r)=>[
-                        'type'            => 'AC',
-                        'id'              => $r->id,
-                        'unit_kerja'      => $r->unit_kerja,
-                        'ruang'           => $r->ruang,
-                        'spes'            => trim($r->merk.' / '.$r->tipe_asset.' / '.$r->ukuran_pk),
-                        'processor'       => null,
-                        'ram'             => null,
-                        'status_warna'    => null,
-                        'resolusi_max'    => null,
-                        'kondisi'         => $r->kondisi,
-                        'remote'          => $r->remote,
-                        'tahun_pembelian' => $r->tahun_pembelian,
-                        'umur'            => $currentYear - (int)$r->tahun_pembelian,
-                    ]),
-        ];
+        // === AGREGASI STORAGE UNTUK PC (SSD/HDD) ===
+        $pcStorageAgg = DB::table('asset_pc as p')
+            ->leftJoin('inventory_hardware_pc as hp', 'hp.id_pc', '=', 'p.id_pc')
+            ->leftJoin('inventory_hardware as h', 'h.id_hardware', '=', 'hp.id_hardware')
+            ->where(function($q){
+                $q->whereNull('h.jenis_hardware')->orWhere('h.jenis_hardware', 'storage');
+            })
+            ->groupBy('p.id_pc')
+            ->selectRaw('p.id_pc,
+                SUM(CASE WHEN UPPER(COALESCE(h.storage_type,"")) = "SSD" THEN 1 ELSE 0 END) as ssd_cnt,
+                SUM(CASE WHEN UPPER(COALESCE(h.storage_type,"")) = "HDD" THEN 1 ELSE 0 END) as hdd_cnt')
+            ->get()
+            ->keyBy('id_pc');
 
+        // ===== Kandidat upgrade (BY BUCKET UMUR) =====
+        // PC biasa
+        $upgradePc = $applyYearRange(
+                AssetPc::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                'tahun_pembelian'
+            )
+            ->get(['id_pc as id','unit_kerja','ruang','merk','processor','total_kapasitas_ram as ram','tahun_pembelian'])
+            ->map(function($r) use($currentYear, $ramThreshold, $pcStorageAgg){
+                $id = $r->id;
+                $agg = $pcStorageAgg->get($id);
+                $ssdCnt = (int)($agg->ssd_cnt ?? 0);
+                $hddCnt = (int)($agg->hdd_cnt ?? 0);
+                $hasSsd = $ssdCnt > 0;
+                $hddOnly = (!$hasSsd && $hddCnt > 0);
+
+                // hitung RAM rendah (angka)
+                $ramGb = (int) preg_replace('/\D+/', '', (string)$r->ram);
+                $ramLow = $ramGb > 0 ? ($ramGb < $ramThreshold) : false;
+
+                return [
+                    'type'            => 'PC',
+                    'id'              => $id,
+                    'unit_kerja'      => $r->unit_kerja,
+                    'ruang'           => $r->ruang,
+                    'spes'            => "{$r->merk} / {$r->processor}",
+                    'processor'       => $r->processor,
+                    'ram'             => $r->ram,
+                    'ram_low'         => $ramLow,
+                    'has_ssd'         => $hasSsd,
+                    'hdd_only'        => $hddOnly,
+                    'status_warna'    => null,
+                    'resolusi_max'    => null,
+                    'tahun_pembelian' => $r->tahun_pembelian,
+                    'umur'            => $currentYear - (int)$r->tahun_pembelian,
+                ];
+            });
+
+        // Printer
+        $upgradePrinter = $applyYearRange(
+                AssetPrinter::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                'tahun_pembelian'
+            )
+            ->get(['id_printer as id','unit_kerja','ruang','merk','tipe','status_warna','tahun_pembelian'])
+            ->map(fn($r)=>[
+                'type'            => 'Printer',
+                'id'              => $r->id,
+                'unit_kerja'      => $r->unit_kerja,
+                'ruang'           => $r->ruang,
+                'spes'            => "{$r->merk} / {$r->tipe}",
+                'processor'       => null,
+                'ram'             => null,
+                'status_warna'    => $r->status_warna,
+                'resolusi_max'    => null,
+                'tahun_pembelian' => $r->tahun_pembelian,
+                'umur'            => $currentYear - (int)$r->tahun_pembelian,
+            ]);
+
+        // Proyektor
+        $upgradeProyektor = $applyYearRange(
+                AssetProyektor::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                'tahun_pembelian'
+            )
+            ->get(['id_proyektor as id','nama_ruang','ruang','merk','tipe_proyektor','resolusi_max','tahun_pembelian'])
+            ->map(fn($r)=>[
+                'type'            => 'Proyektor',
+                'id'              => $r->id,
+                'unit_kerja'      => $r->nama_ruang,
+                'ruang'           => $r->ruang,
+                'spes'            => "{$r->merk} / {$r->tipe_proyektor}",
+                'processor'       => null,
+                'ram'             => null,
+                'status_warna'    => null,
+                'resolusi_max'    => $r->resolusi_max,
+                'tahun_pembelian' => $r->tahun_pembelian,
+                'umur'            => $currentYear - (int)$r->tahun_pembelian,
+            ]);
+
+        // AC
+        $upgradeAc = $applyYearRange(
+                AssetAc::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                'tahun_pembelian'
+            )
+            ->get(['id_ac as id','unit_kerja','ruang','merk','tipe_asset','ukuran_pk','kondisi','remote','tahun_pembelian'])
+            ->map(fn($r)=>[
+                'type'            => 'AC',
+                'id'              => $r->id,
+                'unit_kerja'      => $r->unit_kerja,
+                'ruang'           => $r->ruang,
+                'spes'            => trim($r->merk.' / '.$r->tipe_asset.' / '.$r->ukuran_pk),
+                'processor'       => null,
+                'ram'             => null,
+                'status_warna'    => null,
+                'resolusi_max'    => null,
+                'kondisi'         => $r->kondisi,
+                'remote'          => $r->remote,
+                'tahun_pembelian' => $r->tahun_pembelian,
+                'umur'            => $currentYear - (int)$r->tahun_pembelian,
+            ]);
+
+        // LABKOM — umur saja
+        $upgradeLabkom = $applyYearRange(
+                InventoryLabkom::whereNotNull('tahun_pembelian')->orderBy('tahun_pembelian')->limit(1000),
+                'tahun_pembelian'
+            )
+            ->get(['id_pc as id','nama_lab','ruang','merk','processor','total_kapasitas_ram','tahun_pembelian'])
+            ->map(function($r) use ($currentYear) {
+                return [
+                    'type'            => 'Labkom',
+                    'id'              => $r->id,
+                    'unit_kerja'      => $r->nama_lab, // key lokasi reuse
+                    'ruang'           => $r->ruang,
+                    'spes'            => "{$r->merk} / {$r->processor}",
+                    'processor'       => $r->processor,
+                    'ram'             => is_null($r->total_kapasitas_ram) ? null : (string)$r->total_kapasitas_ram,
+                    'status_warna'    => null,
+                    'resolusi_max'    => null,
+                    'tahun_pembelian' => $r->tahun_pembelian,
+                    'umur'            => $currentYear - (int)$r->tahun_pembelian,
+                ];
+            });
+
+        // Gabungan semua untuk tabel rekomendasi
         $upgradeAll = array_values(array_merge(
-            $upgradeList['pc']->toArray(),
-            $upgradeList['printer']->toArray(),
-            $upgradeList['proyektor']->toArray(),
-            $upgradeList['ac']->toArray()
+            $upgradePc->toArray(),
+            $upgradePrinter->toArray(),
+            $upgradeProyektor->toArray(),
+            $upgradeAc->toArray(),
+            $upgradeLabkom->toArray()
         ));
 
         // Distinct options (opsional)
@@ -192,7 +279,7 @@ class DashboardController extends Controller
             $lok = trim(($u['unit_kerja'] ?? '-')).' / '.trim(($u['ruang'] ?? '-'));
             $lokasiOptions[$lok] = true;
             if (!empty($u['spes']))          $spesOptions[$u['spes']] = true;
-            if (!empty($u['ram']))           $ramOptions[$u['ram']] = true;
+            if (!empty($u['ram']))           $ramOptions[$u['ram']] = true; // termasuk Labkom
             if (!empty($u['status_warna']))  $warnaOptions[$u['status_warna']] = true;
             if (!empty($u['resolusi_max']))  $resolusiOptions[$u['resolusi_max']] = true;
             if (!empty($u['kondisi']))       $kondisiOptions[$u['kondisi']] = true;
@@ -239,16 +326,25 @@ class DashboardController extends Controller
             }));
         }
 
-        // Lokasi rawan (top-5)
+        // ===== Lokasi rawan (Top-5) — panel kiri: aset biasa =====
         usort($upgrade, fn($a,$b)=> $b['umur'] <=> $a['umur']);
         $lokCounter = [];
         foreach ($upgrade as $r) {
+            $typeLower = strtolower($r['type']);
+
+            if ($typeLower === 'pc') {
+                if ($pcRamLow && empty($r['ram_low']))   continue;
+                if ($pcHddOnly && empty($r['hdd_only'])) continue;
+            }
+
+            // panel kiri tidak menghitung Labkom
+            if ($typeLower === 'labkom') continue;
+
             $label = trim($r['unit_kerja'] ?? '-').' / '.trim($r['ruang'] ?? '-');
             if (!isset($lokCounter[$label])) {
                 $lokCounter[$label] = ['pc'=>0,'printer'=>0,'proyektor'=>0,'ac'=>0,'total'=>0];
             }
-            $type = strtolower($r['type']);
-            if (isset($lokCounter[$label][$type])) $lokCounter[$label][$type]++;
+            if (isset($lokCounter[$label][$typeLower])) $lokCounter[$label][$typeLower]++;
             $lokCounter[$label]['total']++;
         }
         uasort($lokCounter, fn($a,$b) => $b['total'] <=> $a['total']);
@@ -264,13 +360,49 @@ class DashboardController extends Controller
             ];
         }
 
-        $lokTitleMap = [
-            3  => 'Lokasi yang Perlu Diperhatikan (Early Warning)',
-            5  => 'Lokasi Rawan (Rekomendasi)',
-            7  => 'Lokasi Prioritas Tinggi',
-            10 => 'Lokasi Tertua (10+ Tahun)',
+        // ===== Lokasi rawan (Top-5) — panel kanan: khusus Labkom =====
+        $labkomOnly = $upgradeLabkom->toArray();
+        usort($labkomOnly, fn($a,$b)=> $b['umur'] <=> $a['umur']);
+        $labkomCounter = [];
+        foreach ($labkomOnly as $r) {
+            $label = trim($r['unit_kerja'] ?? '-').' / '.trim($r['ruang'] ?? '-'); // unit_kerja = nama_lab
+            if (!isset($labkomCounter[$label])) $labkomCounter[$label] = ['labkom'=>0,'total'=>0];
+            $labkomCounter[$label]['labkom']++;
+            $labkomCounter[$label]['total']++;
+        }
+        uasort($labkomCounter, fn($a,$b) => $b['total'] <=> $a['total']);
+        $lokasiRawanLabkom = [];
+        foreach (array_slice($labkomCounter, 0, 5, true) as $label => $counts) {
+            $lokasiRawanLabkom[] = [
+                'label'   => $label,
+                'labkom'  => $counts['labkom'],
+                'total'   => $counts['total'],
+            ];
+        }
+
+        // ===== BAR: Kandidat Upgrade per jenis (tetap) =====
+        $ageLabel = $ageMax === null ? "≥{$ageMin}" : "{$ageMin}–{$ageMax}";
+        $upgradeBar = [
+            'title'  => "Kandidat Upgrade (Umur {$ageLabel} th)",
+            'labels' => ['PC','Printer','Proyektor','AC'],
+            'data'   => [$oldPc, $oldPrinter, $oldProyektor, $oldAc], // PC gabungan
         ];
-        $lokasiTitle = $lokTitleMap[$selected] ?? 'Lokasi Rawan';
+
+        // ===== BAR: Labkom per Lokasi (Top-8) =====
+        $labkomLocCounts = [];
+        foreach ($labkomOnly as $r) {
+            $label = trim($r['unit_kerja'] ?? '-').' / '.trim($r['ruang'] ?? '-');
+            $labkomLocCounts[$label] = ($labkomLocCounts[$label] ?? 0) + 1;
+        }
+        arsort($labkomLocCounts);
+        $topN = 8;
+        $labkomLocLabels = array_slice(array_keys($labkomLocCounts), 0, $topN);
+        $labkomLocData   = array_map(fn($k)=>$labkomLocCounts[$k], $labkomLocLabels);
+        $labkomLocBar = [
+            'title'  => "Labkom Perlu Upgrade per Lokasi (Umur {$ageLabel} th)",
+            'labels' => $labkomLocLabels,
+            'data'   => $labkomLocData,
+        ];
 
         // ===== HISTORI (30 hari, fix WIB) =====
         $history = AssetHistory::where('created_at','>=', $nowJakarta->copy()->subDays(30))
@@ -287,7 +419,6 @@ class DashboardController extends Controller
                         $details[] = "{$k}: ".($from ?? '-')." → ".($to ?? '-');
                     }
                 }
-                // BACA mentah dari DB (string), anggap WIB, jadi epoch ms
                 $raw = $h->getRawOriginal('created_at'); // "YYYY-MM-DD HH:MM:SS"
                 $tsEpoch = null;
                 if ($raw) {
@@ -295,20 +426,28 @@ class DashboardController extends Controller
                 }
 
                 return [
-                    'ts_epoch'   => $tsEpoch,                               // epoch ms (WIB)
+                    'ts_epoch'   => $tsEpoch, // epoch ms
                     'asset_type' => strtoupper($h->asset_type),
                     'asset_id'   => $h->asset_id,
                     'action'     => $h->action,
                     'note'       => $h->note,
                     'summary'    => implode('; ', $details),
-                    'edited_by'  => $h->edited_by ?? '-',                   // 👈 nama user pengedit
+                    'edited_by'  => $h->edited_by ?? '-',
                 ];
             });
 
-        $ageLabel = $ageMax === null ? "≥{$ageMin}" : "{$ageMin}–{$ageMax}";
+        // Judul panel lokasi
+        $lokTitleMap = [
+            3  => 'Lokasi yang Perlu Diperhatikan (Early Warning)',
+            5  => 'Lokasi Rawan (Rekomendasi)',
+            7  => 'Lokasi Prioritas Tinggi',
+            10 => 'Lokasi Tertua (10+ Tahun)',
+        ];
+        $lokasiTitle       = $lokTitleMap[$selected] ?? 'Lokasi Rawan';
+        $lokasiLabkomTitle = $lokTitleMap[$selected] ?? 'Lokasi Rawan (Labkom)';
 
         return response()->json([
-            'now_epoch' => $nowJakarta->getTimestamp()*1000, // epoch WIB (ms)
+            'now_epoch' => $nowJakarta->getTimestamp()*1000,
             'now'       => $nowJakarta->toIso8601String(),
 
             'min_age'   => $selected,
@@ -318,23 +457,29 @@ class DashboardController extends Controller
                 'label' => $ageLabel,
             ],
             'totals' => [
-                'pc'        => $totalPc,
+                'pc'        => $totalPcCombined, // PC gabungan
+                'labkom'    => $totalLabkom,   // 👈 NEW: kartu khusus Labkom
                 'printer'   => $totalPrinter,
                 'proyektor' => $totalProyektor,
                 'ac'        => $totalAc,
                 'old' => [
-                    'pc'        => $oldPc,
+                    'pc'        => $oldPc,        // PC gabungan
+                    'labkom'    => $oldLabkom,  // 👈 NEW: old Labkom
                     'printer'   => $oldPrinter,
                     'proyektor' => $oldProyektor,
                     'ac'        => $oldAc,
                 ],
             ],
-            'bar'             => $bar,
-            'pie'             => $pie,
-            'upgrade'         => $upgrade,
-            'lokasi_rawan'    => $lokasiRawan,
-            'lokasi_title'    => $lokasiTitle,
-            'history'         => $history,
+            'bar'                  => $bar,
+            'pie'                  => $pie,
+            'upgrade_bar'          => $upgradeBar,
+            'labkom_loc_bar'       => $labkomLocBar,
+            'upgrade'              => $upgrade,
+            'lokasi_rawan'         => $lokasiRawan,
+            'lokasi_title'         => $lokasiTitle,
+            'lokasi_rawan_labkom'  => $lokasiRawanLabkom,
+            'lokasi_labkom_title'  => $lokasiLabkomTitle,
+            'history'              => $history,
             'filters' => [
                 'lokasi_options'   => $lokasiOptions,
                 'spes_options'     => $spesOptions,
@@ -343,6 +488,11 @@ class DashboardController extends Controller
                 'resolusi_options' => $resolusiOptions,
                 'kondisi_options'  => $kondisiOptions,
                 'remote_options'   => $remoteOptions,
+            ],
+            'pc_params' => [
+                'ram_low'        => $pcRamLow,
+                'hdd_only'       => $pcHddOnly,
+                'ram_threshold'  => $ramThreshold,
             ],
         ]);
     }
