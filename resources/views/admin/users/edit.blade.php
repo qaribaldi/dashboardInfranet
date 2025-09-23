@@ -54,6 +54,14 @@
         {!! $cb('dashboard.view.chart', 'dashboard.view.chart') !!}
         {!! $cb('dashboard.view.lokasi-rawan', 'dashboard.view.lokasi-rawan') !!}
         {!! $cb('dashboard.view.history', 'dashboard.view.history') !!}
+
+        <div class="col-span-full pt-2 text-xs text-gray-500">
+          Hak akses baris histori per tipe aset (Jika mengaktifkan <b>dashboard.view.history</b>, wajib pilih minimal satu tipe aset di bawah):
+        </div>
+        {!! $cb('dashboard.history.pc', 'dashboard.history.pc (PC)') !!}
+        {!! $cb('dashboard.history.printer', 'dashboard.history.printer (Printer)') !!}
+        {!! $cb('dashboard.history.proyektor', 'dashboard.history.proyektor (Proyektor)') !!}
+        {!! $cb('dashboard.history.ac', 'dashboard.history.ac (AC)') !!}
       </div>
     </fieldset>
 
@@ -168,4 +176,26 @@
       <a href="{{ route('admin.users.index') }}" class="px-4 py-2 rounded-lg border hover:bg-gray-50">Batal</a>
     </div>
   </form>
+
+  <script>
+document.querySelector('form').addEventListener('submit', function(e){
+  const historyBox = document.querySelector('input[value="dashboard.view.history"]');
+  if (historyBox && historyBox.checked) {
+    const required = [
+      'dashboard.history.pc',
+      'dashboard.history.printer',
+      'dashboard.history.proyektor',
+      'dashboard.history.ac'
+    ];
+    const ok = required.some(val => 
+      document.querySelector(`input[value="${val}"]`)?.checked
+    );
+    if (!ok) {
+      e.preventDefault();
+      alert('Jika aktifkan Dashboard History, pilih minimal satu tipe aset (PC/Printer/Proyektor/AC).');
+    }
+  }
+});
+</script>
+
 @endsection

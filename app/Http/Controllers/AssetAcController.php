@@ -71,7 +71,6 @@ class AssetAcController extends Controller
             $method = self::TYPE_MAP[$type];
             $colDef = $table->{$method}($col);
 
-            // set nullable tanpa cek method_exists (karena ColumnDefinition pakai __call)
             if ($nullable) {
                 $colDef->nullable();
             }
@@ -94,7 +93,7 @@ class AssetAcController extends Controller
         $this->ensureColumns([[
             'name'     => $data['name'],
             'type'     => $data['type'],
-            'nullable' => (bool)($data['nullable'] ?? true),
+            'nullable' => $request->boolean('nullable'),
         ]]);
 
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');

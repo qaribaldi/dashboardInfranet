@@ -83,6 +83,10 @@
 
     $cols = array_values(array_diff($allCols, $skip));
     $titleize = fn($s) => ucwords(str_replace('_',' ', $s));
+
+    // dari controller
+    $boolCols = $boolCols ?? [];
+
   @endphp
 
   <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
@@ -105,12 +109,14 @@
               <td class="px-4 py-2">
                 @php $val = data_get($row, $c); @endphp
 
-                {{-- tampilkan tanggal saja untuk kolom tanggal_pembelian (tanpa jam) --}}
-                @if($c === 'tanggal_pembelian' && !empty($val))
+                @if(in_array($c, $boolCols) && !is_null($val))
+                  {!! $val ? '✓' : '—' !!}
+                @elseif($c === 'tanggal_pembelian' && !empty($val))
                   {{ \Illuminate\Support\Carbon::parse($val)->format('Y-m-d') }}
                 @else
                   {{ $val ?? '—' }}
                 @endif
+
               </td>
             @endforeach
 

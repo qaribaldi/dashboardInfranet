@@ -283,22 +283,32 @@
 
   {{-- Histori --}}
   @can('dashboard.view.history')
-    <div class="mt-6 rounded-xl border bg-white">
-      <div class="border-b px-4 py-3 flex items-center justify-between">
-        <h3 class="font-semibold">Histori Perbaikan/Upgrade (30 hari)</h3>
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2">
-            <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
-            <select id="hisType" class="rounded border px-2 py-1 text-sm">
-              <option value="ALL" selected>Semua</option>
-              <option value="PC">PC</option>
-              <option value="Printer">Printer</option>
-              <option value="Proyektor">Proyektor</option>
-              <option value="AC">AC</option>
-            </select>
-          </div>
-        </div>
-      </div>
+    <div class="border-b px-4 py-3 flex items-center justify-between">
+  <h3 class="font-semibold">
+    Histori Perbaikan/Upgrade (<span id="hisPeriod">-</span>)
+  </h3>
+
+  <div class="flex items-center gap-3">
+    {{-- Periode (bulan) --}}
+    <div class="flex items-center gap-2">
+      <label for="hisMonth" class="text-xs text-gray-600">Periode</label>
+      <input type="month" id="hisMonth" class="rounded border px-2 py-1 text-sm">
+    </div>
+
+    {{-- Tipe aset --}}
+    <div class="flex items-center gap-2">
+      <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
+      <select id="hisType" class="rounded border px-2 py-1 text-sm">
+        <option value="ALL" selected>Semua</option>
+        <option value="PC">PC</option>
+        <option value="Printer">Printer</option>
+        <option value="Proyektor">Proyektor</option>
+        <option value="AC">AC</option>
+      </select>
+    </div>
+  </div>
+</div>
+
 
       <div class="p-4 overflow-x-auto">
         <table class="min-w-full text-sm">
@@ -369,6 +379,7 @@
   let historyFiltered = [];
   let hisType = 'ALL';
   let pageHistory = 1;
+  let historyMonth = ''; 
 
   let assetType = 'ALL';
   let filterField = '';
@@ -812,11 +823,30 @@
 
   // History
   function updateHistory(m) {
-    const body = document.getElementById('historyBody');
-    if (!body) return;
-    historyAll = Array.isArray(m.history) ? m.history : [];
-    applyHistoryFilter(true);
+  const body = document.getElementById('historyBody');
+  if (!body) return;
+
+  const lbl = document.getElementById('hisPeriod');
+  if (lbl) lbl.textContent = m.history_period_label || '30 hari';
+
+  // === Jika akses ditolak ===
+  if (m.history_denied) {
+    body.innerHTML = `<tr><td colspan="6" 
+      class="px-3 py-4 text-center text-red-600">
+      Anda tidak memiliki akses untuk melihat tabel ini. 
+      Minta admin untuk memberikan anda akses.
+    </td></tr>`;
+    document.getElementById('hisPageInfo').textContent = `0 / 0`;
+    historyAll = [];
+    historyFiltered = [];
+    return;
   }
+
+  // === Normal: render data histori ===
+  historyAll = Array.isArray(m.history) ? m.history : [];
+  applyHistoryFilter(true);
+}
+
 
   function applyHistoryFilter(resetPage = true) {
     const sel = document.getElementById('hisType');
@@ -835,21 +865,23 @@
   }
 
   function renderHistoryPage(list) {
-    const body = document.getElementById('historyBody');
-    if (!body) return;
+  const body = document.getElementById('historyBody');
+  if (!body) return;
 
-    const total = list.length;
-    const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
-    pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
+  const total = list.length;
+  const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+  pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
 
-    document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
+  document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
 
-    if (!total) {
-      body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
-        Belum ada histori 30 hari terakhir.
-      </td></tr>`;
-      return;
-    }
+  // === Jika data kosong tapi bukan karena akses ditolak ===
+  if (!total) {
+    body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
+      Tidak ada histori pada periode ini.
+    </td></tr>`;
+    document.getElementById('hisPageInfo').textContent = `0 / 0`;
+    return;
+  }
 
     const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
     const rows = list.slice(start, start + HISTORY_PAGE_SIZE);
@@ -1013,6 +1045,21 @@
       });
     }
 
+    const hisMonthInput = document.getElementById('hisMonth');
+
+if (hisMonthInput) {
+  hisMonthInput.addEventListener('change', () => {
+    historyMonth = hisMonthInput.value || '';
+    fetchMetrics();
+  });
+}
+
+// ▶️ Filter Tipe Aset (Histori): render ulang saat berubah
+const hisTypeSel = document.getElementById('hisType');
+if (hisTypeSel) {
+  hisTypeSel.addEventListener('change', () => applyHistoryFilter(true));
+}
+
     const cRam = document.getElementById('chkRamLow');
     const cHdd = document.getElementById('chkHddOnly');
     if (cRam) cRam.addEventListener('change', () => { pcRamLow = !!cRam.checked; fetchMetrics(); applyDropdownFilter(); });
@@ -1056,26 +1103,31 @@
   });
 
   async function fetchMetrics() {
-    const url = "{{ route('dashboard.metrics') }}"
-      + `?min_age=${minAge}`
-      + `&pc_ram_low=${pcRamLow ? 1 : 0}`
-      + `&pc_hdd_only=${pcHddOnly ? 1 : 0}`;
+  let url = "{{ route('dashboard.metrics') }}"
+    + `?min_age=${minAge}`
+    + `&pc_ram_low=${pcRamLow ? 1 : 0}`
+    + `&pc_hdd_only=${pcHddOnly ? 1 : 0}`;
 
-    try {
-      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
-      const metrics = await res.json();
-
-      lastMetrics = metrics;
-      updateKpis(metrics);
-      updateBar(metrics);
-      updatePie(metrics);
-      updateUpgradeTable(metrics);
-      updateLokasiRawan(metrics);
-      updateLokasiRawanLabkom(metrics);
-      updateHistory(metrics);
-    } catch (e) {
-      console.error(e);
-    }
+  if (historyMonth) {
+    url += `&history_month=${encodeURIComponent(historyMonth)}`;
   }
+
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
+    const metrics = await res.json();
+
+    lastMetrics = metrics;
+    updateKpis(metrics);
+    updateBar(metrics);
+    updatePie(metrics);
+    updateUpgradeTable(metrics);
+    updateLokasiRawan(metrics);
+    updateLokasiRawanLabkom(metrics);
+    updateHistory(metrics);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 </script>
 @endpush

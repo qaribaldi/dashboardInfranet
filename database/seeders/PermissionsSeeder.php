@@ -52,8 +52,16 @@ class PermissionsSeeder extends Seeder
             'dashboard.view.kpi', 'dashboard.view.chart',
         ];
 
+        // Dashboard history per tipe aset
+        $dashboardHistoryPerType = [
+            'dashboard.history.pc',
+            'dashboard.history.printer',
+            'dashboard.history.proyektor',
+            'dashboard.history.ac',
+        ];
+
         // Buat semua permission
-        foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms) as $name) {
+        foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms, $dashboardHistoryPerType) as $name) {
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 

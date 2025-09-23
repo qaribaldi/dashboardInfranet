@@ -404,37 +404,88 @@ class DashboardController extends Controller
             'data'   => $labkomLocData,
         ];
 
-        // ===== HISTORI (30 hari, fix WIB) =====
-        $history = AssetHistory::where('created_at','>=', $nowJakarta->copy()->subDays(30))
-            ->orderBy('created_at','desc')
-            ->limit(50)
-            ->get()
-            ->map(function($h) {
-                $details = [];
-                $changes = $h->changes_json ?? [];
-                if (is_array($changes)) {
-                    foreach ($changes as $k => $pair) {
-                        $from = is_array($pair) && array_key_exists('from', $pair) ? $pair['from'] : null;
-                        $to   = is_array($pair) && array_key_exists('to', $pair)   ? $pair['to']   : null;
-                        $details[] = "{$k}: ".($from ?? '-')." → ".($to ?? '-');
-                    }
-                }
-                $raw = $h->getRawOriginal('created_at'); // "YYYY-MM-DD HH:MM:SS"
-                $tsEpoch = null;
-                if ($raw) {
-                    $tsEpoch = Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'Asia/Jakarta')->getTimestamp() * 1000;
-                }
+        // ===== HISTORI (per bulan atau 30 hari, WIB) =====
+$historyMonth = trim((string) $request->input('history_month', '')); // format 'YYYY-MM' atau ''
+$periodLabel  = '30 hari'; // default label untuk judul
+$histQuery    = AssetHistory::query();
 
-                return [
-                    'ts_epoch'   => $tsEpoch, // epoch ms
-                    'asset_type' => strtoupper($h->asset_type),
-                    'asset_id'   => $h->asset_id,
-                    'action'     => $h->action,
-                    'note'       => $h->note,
-                    'summary'    => implode('; ', $details),
-                    'edited_by'  => $h->edited_by ?? '-',
-                ];
-            });
+if ($historyMonth !== '') {
+    // Jika user pilih bulan tertentu → filter range 1 s/d akhir bulan tsb
+    try {
+        [$y, $m] = explode('-', $historyMonth);
+        $start = Carbon::createFromDate((int)$y, (int)$m, 1, 'Asia/Jakarta')->startOfMonth();
+        $end   = $start->copy()->endOfMonth();
+        $histQuery->whereBetween('created_at', [$start, $end]);
+
+        // Label periode, contoh: "September 2025"
+        $periodLabel = $start->locale('id')->translatedFormat('F Y');
+    } catch (\Throwable $e) {
+        // fallback ke 30 hari terakhir jika parsing gagal
+        $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
+        $periodLabel = '30 hari';
+    }
+} else {
+    // Default: 30 hari terakhir
+    $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
+    $periodLabel = '30 hari';
+}
+
+$user = auth()->user();
+
+$canHistory = $user->can('dashboard.view.history');
+
+$histMap = [
+    'PC'        => 'dashboard.history.pc',
+    'PRINTER'   => 'dashboard.history.printer',
+    'PROYEKTOR' => 'dashboard.history.proyektor',
+    'AC'        => 'dashboard.history.ac',
+];
+
+$allowedTypes = [];
+foreach ($histMap as $type => $perm) {
+    if ($user->can($perm)) {
+        $allowedTypes[] = $type;
+    }
+}
+
+$historyDenied = false;
+
+if (! $canHistory || empty($allowedTypes)) {
+    $historyDenied = true;
+    $history = collect();
+} else {
+    $histQuery->whereIn(DB::raw('UPPER(asset_type)'), $allowedTypes);
+    $history = $histQuery
+        ->orderBy('created_at','desc')
+        ->limit(200)
+        ->get()
+        ->map(function($h) {
+            $details = [];
+            $changes = $h->changes_json ?? [];
+            if (is_array($changes)) {
+                foreach ($changes as $k => $pair) {
+                    $from = $pair['from'] ?? null;
+                    $to   = $pair['to'] ?? null;
+                    $details[] = "{$k}: ".($from ?? '-')." → ".($to ?? '-');
+                }
+            }
+
+            $raw = $h->getRawOriginal('created_at');
+            $tsEpoch = $raw 
+                ? Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'Asia/Jakarta')->getTimestamp() * 1000
+                : null;
+
+            return [
+                'ts_epoch'   => $tsEpoch,
+                'asset_type' => strtoupper($h->asset_type),
+                'asset_id'   => $h->asset_id,
+                'action'     => $h->action,
+                'note'       => $h->note,
+                'summary'    => implode('; ', $details),
+                'edited_by'  => $h->edited_by ?? '-',
+            ];
+        });
+}
 
         // Judul panel lokasi
         $lokTitleMap = [
@@ -480,6 +531,9 @@ class DashboardController extends Controller
             'lokasi_rawan_labkom'  => $lokasiRawanLabkom,
             'lokasi_labkom_title'  => $lokasiLabkomTitle,
             'history'              => $history,
+            'history_denied' => $historyDenied,
+            'history_month'         => $historyMonth,
+            'history_period_label'  => $historyMonth !== '' ? $periodLabel : '30 hari',
             'filters' => [
                 'lokasi_options'   => $lokasiOptions,
                 'spes_options'     => $spesOptions,

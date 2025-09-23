@@ -76,13 +76,9 @@ class InventoryLabkomController extends Controller
                 $method = self::TYPE_MAP[$type];
                 $colDef = $table->{$method}($col);
 
-                // date/datetime wajib nullable agar aman utk data lama
-                if (in_array($type, ['date','datetime'], true)) {
+                // bikin nullable kalau diminta (semua tipe boleh)
+                if ($nullable) {
                     $colDef->nullable();
-                } else {
-                    if ($nullable && method_exists($colDef, 'nullable')) {
-                        $colDef->nullable();
-                    }
                 }
             });
 
@@ -103,7 +99,7 @@ class InventoryLabkomController extends Controller
         $this->ensureColumns([[
             'name'     => $data['name'],
             'type'     => $data['type'],
-            'nullable' => (bool)($data['nullable'] ?? true),
+            'nullable' => $request->boolean('nullable'),
         ]]);
 
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');

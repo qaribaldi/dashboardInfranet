@@ -79,16 +79,11 @@ class AssetPcController extends Controller
             $method = self::TYPE_MAP[$type];
             $colDef = $table->{$method}($col);
 
-            // 🔑 KUNCI: date/datetime wajib nullable agar aman untuk baris lama
-            if (in_array($type, ['date','datetime'], true)) {
+            if ($nullable) {
                 $colDef->nullable();
-            } else {
-                // kalau tipe lain, ikuti flag $nullable (string tidak perlu dipaksa khusus)
-                if ($nullable && method_exists($colDef, 'nullable')) {
-                    $colDef->nullable();
-                }
             }
         });
+
 
         $added[] = $col;
     }
@@ -146,7 +141,7 @@ class AssetPcController extends Controller
         $this->ensureColumns([[
             'name'     => $data['name'],
             'type'     => $data['type'],
-            'nullable' => (bool)($data['nullable'] ?? true),
+            'nullable' => $request->boolean('nullable'),
         ]]);
 
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');

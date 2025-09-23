@@ -174,43 +174,53 @@
       </div>
 
       {{-- Kolom dinamis lain --}}
-      @foreach($fields as $name => $label)
-        @continue(in_array($name, [
-          'id_hardware','jenis_hardware','storage_type','vendor',
-          'tanggal_pembelian','jumlah_stock','status','tanggal_digunakan','id_pc'
-        ]))
+@foreach($fields as $name => $label)
+  @continue(in_array($name, [
+    'id_hardware','jenis_hardware','storage_type','vendor',
+    'tanggal_pembelian','jumlah_stock','status','tanggal_digunakan','id_pc'
+  ]))
 
-        @php
-          $isDate = in_array($name, $dateCols ?? []);
-          $isDt   = in_array($name, $datetimeCols ?? []);
-          $raw    = old($name, $data->{$name} ?? null);
+  @php
+    $isDate = in_array($name, $dateCols ?? []);
+    $isDt   = in_array($name, $datetimeCols ?? []);
+    $isBool = in_array($name, $boolCols ?? []);
+    $raw    = old($name, $data->{$name} ?? null);
 
-          if ($isDate) {
-              $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d') : '';
-          } elseif ($isDt) {
-              $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d\TH:i') : '';
-          } else {
-              $val = $raw;
-          }
-        @endphp
+    if ($isDate) {
+        $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d') : '';
+    } elseif ($isDt) {
+        $val = $raw ? \Illuminate\Support\Carbon::parse($raw)->format('Y-m-d\TH:i') : '';
+    } else {
+        $val = $raw;
+    }
+  @endphp
 
-        <div>
-          <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
+  <div>
+    <label class="block text-sm font-medium mb-1" for="{{ $name }}">{{ $label }}</label>
 
-          @if($isDate)
-            <input type="date" id="{{ $name }}" name="{{ $name }}"
-                   value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
-          @elseif($isDt)
-            <input type="datetime-local" id="{{ $name }}" name="{{ $name }}"
-                   value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
-          @else
-            <input id="{{ $name }}" name="{{ $name }}" value="{{ $val }}"
-                   class="w-full rounded-lg border border-gray-300 px-3 py-2" />
-          @endif
+    @if($isDate)
+      <input type="date" id="{{ $name }}" name="{{ $name }}"
+             value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+    @elseif($isDt)
+      <input type="datetime-local" id="{{ $name }}" name="{{ $name }}"
+             value="{{ $val }}" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+    @elseif($isBool)
+      {{-- hidden fallback agar unchecked tetap terkirim sebagai 0 --}}
+      <input type="hidden" name="{{ $name }}" value="0">
+      <label class="inline-flex items-center gap-2">
+        <input type="checkbox" id="{{ $name }}" name="{{ $name }}" value="1"
+               {{ (string)$raw === '1' || $raw === 1 || $raw === true ? 'checked' : '' }}>
+        <span>Ya / Aktif</span>
+      </label>
+    @else
+      <input id="{{ $name }}" name="{{ $name }}" value="{{ $val }}"
+             class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+    @endif
 
-          @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
-        </div>
-      @endforeach
+    @error($name) <div class="text-sm text-red-600 mt-1">{{ $message }}</div> @enderror
+  </div>
+@endforeach
+
     </div>
 
     <!-- <div>
