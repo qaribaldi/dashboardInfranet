@@ -9,22 +9,33 @@ use App\Http\Controllers\AssetPrinterController;
 use App\Http\Controllers\AssetProyektorController;
 use App\Http\Controllers\AssetAcController;
 use App\Http\Controllers\InventoryHardwareController;
-use App\Http\Controllers\InventoryLabkomController; // LABKOM
+use App\Http\Controllers\InventoryLabkomController; 
 use App\Http\Controllers\BackupController;
 
-
-// Admin
+use App\Http\Controllers\Admin\SiteInfoController;
 use App\Http\Controllers\Admin\UserManagementController;
 
 /**
  * =========================
- * LANDING (publik) + INFO
+ * LANDING (publik)
  * =========================
  */
 Route::get('/', [PublicController::class, 'landing'])->name('landing');
-Route::post('/landing/info', [PublicController::class, 'updateInfo'])
-    ->middleware(['auth','admin'])
-    ->name('landing.info.update');
+
+/**
+ * =========================
+ * ADMIN: SITE INFO (Landing)
+ * =========================
+ */
+Route::middleware(['auth', 'can:siteinfo.manage'])
+    ->prefix('admin')
+    ->name('admin.')
+    ->group(function () {
+        Route::get('siteinfo/edit',            [SiteInfoController::class, 'edit'])->name('siteinfo.edit');
+        Route::put('siteinfo/update',          [SiteInfoController::class, 'update'])->name('siteinfo.update');
+        // per-card submit (dipakai oleh view edit)
+        Route::put('siteinfo/update/{section}',[SiteInfoController::class, 'updateSection'])->name('siteinfo.updateSection');
+    });
 
 /**
  * =========================
@@ -47,12 +58,10 @@ Route::get('/backup/csv', [BackupController::class, 'csv'])
     ->middleware(['auth','permission:backup.download'])
     ->name('backup.csv');
 
-
 /**
  * =========================
  * INVENTORY ROOT
  * =========================
- * Arahkan ke modul pertama yang boleh dilihat user.
  */
 Route::get('/inventory', function () {
     $u = auth()->user();
@@ -69,25 +78,22 @@ Route::get('/inventory', function () {
 
 /**
  * ============================================================
- * INVENTORY (CRUD & TOOLS via PERMISSION, BUKAN admin) — TOP
+ * INVENTORY (CRUD & TOOLS via PERMISSION, BUKAN admin)
  * ============================================================
  */
 Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(function () {
-    // ===== PC =====
+    // PC
     Route::get('pc/create', [AssetPcController::class, 'create'])
         ->middleware('permission:inventory.pc.create')->name('pc.create');
     Route::post('pc', [AssetPcController::class, 'store'])
         ->middleware('permission:inventory.pc.create')->name('pc.store');
-
     Route::get('pc/{pc}/edit', [AssetPcController::class, 'edit'])
         ->middleware('permission:inventory.pc.edit')->name('pc.edit');
     Route::put('pc/{pc}', [AssetPcController::class, 'update'])
         ->middleware('permission:inventory.pc.edit')->name('pc.update');
-
     Route::delete('pc/{pc}', [AssetPcController::class, 'destroy'])
         ->middleware('permission:inventory.pc.delete')->name('pc.destroy');
 
-    // Import CSV + Template
     Route::get('pc/import', [AssetPcController::class,'importForm'])
         ->middleware('permission:inventory.pc.import')->name('pc.importForm');
     Route::post('pc/import', [AssetPcController::class,'importStore'])
@@ -95,7 +101,6 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::get('pc/template', [AssetPcController::class,'downloadTemplate'])
         ->middleware('permission:inventory.pc.import')->name('pc.template');
 
-    // Kelola Kolom
     Route::post  ('pc/columns',        [AssetPcController::class,'addColumn'])
         ->middleware('permission:inventory.pc.columns')->name('pc.columns.add');
     Route::post  ('pc/columns/rename', [AssetPcController::class,'renameColumn'])
@@ -103,17 +108,15 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('pc/columns/drop',   [AssetPcController::class,'dropColumn'])
         ->middleware('permission:inventory.pc.columns')->name('pc.columns.drop');
 
-    // ===== Printer =====
+    // Printer
     Route::get('printer/create', [AssetPrinterController::class, 'create'])
         ->middleware('permission:inventory.printer.create')->name('printer.create');
     Route::post('printer', [AssetPrinterController::class, 'store'])
         ->middleware('permission:inventory.printer.create')->name('printer.store');
-
     Route::get('printer/{printer}/edit', [AssetPrinterController::class, 'edit'])
         ->middleware('permission:inventory.printer.edit')->name('printer.edit');
     Route::put('printer/{printer}', [AssetPrinterController::class, 'update'])
         ->middleware('permission:inventory.printer.edit')->name('printer.update');
-
     Route::delete('printer/{printer}', [AssetPrinterController::class, 'destroy'])
         ->middleware('permission:inventory.printer.delete')->name('printer.destroy');
 
@@ -131,17 +134,15 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('printer/columns/drop',   [AssetPrinterController::class,'dropColumn'])
         ->middleware('permission:inventory.printer.columns')->name('printer.columns.drop');
 
-    // ===== Proyektor =====
+    // Proyektor
     Route::get('proyektor/create', [AssetProyektorController::class, 'create'])
         ->middleware('permission:inventory.proyektor.create')->name('proyektor.create');
     Route::post('proyektor', [AssetProyektorController::class, 'store'])
         ->middleware('permission:inventory.proyektor.create')->name('proyektor.store');
-
     Route::get('proyektor/{proyektor}/edit', [AssetProyektorController::class, 'edit'])
         ->middleware('permission:inventory.proyektor.edit')->name('proyektor.edit');
     Route::put('proyektor/{proyektor}', [AssetProyektorController::class, 'update'])
         ->middleware('permission:inventory.proyektor.edit')->name('proyektor.update');
-
     Route::delete('proyektor/{proyektor}', [AssetProyektorController::class, 'destroy'])
         ->middleware('permission:inventory.proyektor.delete')->name('proyektor.destroy');
 
@@ -159,17 +160,15 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('proyektor/columns/drop',   [AssetProyektorController::class,'dropColumn'])
         ->middleware('permission:inventory.proyektor.columns')->name('proyektor.columns.drop');
 
-    // ===== AC =====
+    // AC
     Route::get('ac/create', [AssetAcController::class, 'create'])
         ->middleware('permission:inventory.ac.create')->name('ac.create');
     Route::post('ac', [AssetAcController::class, 'store'])
         ->middleware('permission:inventory.ac.create')->name('ac.store');
-
     Route::get('ac/{ac}/edit', [AssetAcController::class, 'edit'])
         ->middleware('permission:inventory.ac.edit')->name('ac.edit');
     Route::put('ac/{ac}', [AssetAcController::class, 'update'])
         ->middleware('permission:inventory.ac.edit')->name('ac.update');
-
     Route::delete('ac/{ac}', [AssetAcController::class, 'destroy'])
         ->middleware('permission:inventory.ac.delete')->name('ac.destroy');
 
@@ -187,17 +186,15 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('ac/columns/drop',   [AssetAcController::class,'dropColumn'])
         ->middleware('permission:inventory.ac.columns')->name('ac.columns.drop');
 
-    // ===== Hardware =====
+    // Hardware
     Route::get('hardware/create', [InventoryHardwareController::class, 'create'])
         ->middleware('permission:inventory.hardware.create')->name('hardware.create');
     Route::post('hardware', [InventoryHardwareController::class, 'store'])
         ->middleware('permission:inventory.hardware.create')->name('hardware.store');
-
     Route::get('hardware/{hardware}/edit', [InventoryHardwareController::class, 'edit'])
         ->middleware('permission:inventory.hardware.edit')->name('hardware.edit');
     Route::put('hardware/{hardware}', [InventoryHardwareController::class, 'update'])
         ->middleware('permission:inventory.hardware.edit')->name('hardware.update');
-
     Route::delete('hardware/{hardware}', [InventoryHardwareController::class, 'destroy'])
         ->middleware('permission:inventory.hardware.delete')->name('hardware.destroy');
 
@@ -215,21 +212,18 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::delete('hardware/columns/drop',   [InventoryHardwareController::class,'dropColumn'])
         ->middleware('permission:inventory.hardware.columns')->name('hardware.columns.drop');
 
-    // ===== LABKOM =====
+    // Labkom
     Route::get('labkom/create', [InventoryLabkomController::class, 'create'])
         ->middleware('permission:inventory.labkom.create')->name('labkom.create');
     Route::post('labkom', [InventoryLabkomController::class, 'store'])
         ->middleware('permission:inventory.labkom.create')->name('labkom.store');
-
     Route::get('labkom/{labkom}/edit', [InventoryLabkomController::class, 'edit'])
         ->middleware('permission:inventory.labkom.edit')->name('labkom.edit');
     Route::put('labkom/{labkom}', [InventoryLabkomController::class, 'update'])
         ->middleware('permission:inventory.labkom.edit')->name('labkom.update');
-
     Route::delete('labkom/{labkom}', [InventoryLabkomController::class, 'destroy'])
         ->middleware('permission:inventory.labkom.delete')->name('labkom.destroy');
 
-    // Import CSV + Template — LABKOM
     Route::get('labkom/import', [InventoryLabkomController::class,'importForm'])
         ->middleware('permission:inventory.labkom.import')->name('labkom.importForm');
     Route::post('labkom/import', [InventoryLabkomController::class,'importStore'])
@@ -237,7 +231,6 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
     Route::get('labkom/template', [InventoryLabkomController::class,'downloadTemplate'])
         ->middleware('permission:inventory.labkom.import')->name('labkom.template');
 
-    // Kelola Kolom — LABKOM
     Route::post  ('labkom/columns',        [InventoryLabkomController::class,'addColumn'])
         ->middleware('permission:inventory.labkom.columns')->name('labkom.columns.add');
     Route::post  ('labkom/columns/rename', [InventoryLabkomController::class,'renameColumn'])
@@ -248,40 +241,22 @@ Route::prefix('inventory')->middleware(['auth'])->name('inventory.')->group(func
 
 /**
  * ============================================================
- * INVENTORY (VIEW: index/show) — Dipagari permission *.view
+ * INVENTORY (VIEW: index/show)
  * ============================================================
  */
 Route::prefix('inventory')->name('inventory.')->group(function () {
-
-    // PC
-    Route::middleware(['auth','permission:inventory.pc.view'])->group(function () {
-        Route::resource('pc', AssetPcController::class)->only(['index','show']);
-    });
-
-    // Printer
-    Route::middleware(['auth','permission:inventory.printer.view'])->group(function () {
-        Route::resource('printer', AssetPrinterController::class)->only(['index','show']);
-    });
-
-    // Proyektor
-    Route::middleware(['auth','permission:inventory.proyektor.view'])->group(function () {
-        Route::resource('proyektor', AssetProyektorController::class)->only(['index','show']);
-    });
-
-    // AC
-    Route::middleware(['auth','permission:inventory.ac.view'])->group(function () {
-        Route::resource('ac', AssetAcController::class)->only(['index','show']);
-    });
-
-    // Hardware
-    Route::middleware(['auth','permission:inventory.hardware.view'])->group(function () {
-        Route::resource('hardware', InventoryHardwareController::class)->only(['index','show']);
-    });
-
-    // LABKOM
-    Route::middleware(['auth','permission:inventory.labkom.view'])->group(function () {
-        Route::resource('labkom', InventoryLabkomController::class)->only(['index','show']);
-    });
+    Route::middleware(['auth','permission:inventory.pc.view'])
+        ->group(fn() => Route::resource('pc', AssetPcController::class)->only(['index','show']));
+    Route::middleware(['auth','permission:inventory.printer.view'])
+        ->group(fn() => Route::resource('printer', AssetPrinterController::class)->only(['index','show']));
+    Route::middleware(['auth','permission:inventory.proyektor.view'])
+        ->group(fn() => Route::resource('proyektor', AssetProyektorController::class)->only(['index','show']));
+    Route::middleware(['auth','permission:inventory.ac.view'])
+        ->group(fn() => Route::resource('ac', AssetAcController::class)->only(['index','show']));
+    Route::middleware(['auth','permission:inventory.hardware.view'])
+        ->group(fn() => Route::resource('hardware', InventoryHardwareController::class)->only(['index','show']));
+    Route::middleware(['auth','permission:inventory.labkom.view'])
+        ->group(fn() => Route::resource('labkom', InventoryLabkomController::class)->only(['index','show']));
 });
 
 /**
@@ -296,5 +271,4 @@ Route::prefix('admin')->middleware(['auth','admin'])->name('admin.')->group(func
     Route::delete('users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
 });
 
-// Auth routes
 require __DIR__.'/auth.php';

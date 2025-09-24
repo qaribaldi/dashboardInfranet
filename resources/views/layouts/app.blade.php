@@ -29,17 +29,28 @@
             </x-slot>
 
             <x-slot name="content">
-              {{-- === MENU ADMIN KHUSUS: MANAJEMEN USER === --}}
-              @if(optional(Auth::user())->role === 'admin')
+              {{-- === MENU KHUSUS ADMIN (role admin saja) === --}}
+              @php
+                $isAdmin = auth()->check() && method_exists(auth()->user(), 'hasRole') && auth()->user()->hasRole('admin');
+              @endphp
+              @if ($isAdmin)
                 @if (Route::has('admin.users.index'))
                   <x-dropdown-link href="{{ route('admin.users.index') }}">
                     {{ __('Manajemen User') }}
                   </x-dropdown-link>
-                @else
-                  {{-- Route belum dibuat; aman-aman saja, tidak ditampilkan linknya --}}
                 @endif
                 <div class="border-t my-1"></div>
               @endif
+
+              {{-- === EDIT LANDING (berdasarkan permission, TIDAK harus admin) === --}}
+              @can('siteinfo.manage')
+                @if (Route::has('admin.siteinfo.edit'))
+                  <x-dropdown-link href="{{ route('admin.siteinfo.edit') }}">
+                    {{ __('Edit Landing Page') }}
+                  </x-dropdown-link>
+                @endif
+                <div class="border-t my-1"></div>
+              @endcan
 
               {{-- === LOGOUT === --}}
               <form method="POST" action="{{ route('logout') }}">
@@ -54,34 +65,33 @@
         </header>
 
         {{-- Content --}}
-       <main class="flex-1 p-6">
-  @once
-    @if (session('success'))
-      <div class="mb-4 rounded-lg border border-green-200 bg-green-50 text-green-800 px-4 py-3">
-        {{ session('success') }}
-      </div>
-    @endif
+        <main class="flex-1 p-6">
+          @once
+            @if (session('success'))
+              <div class="mb-4 rounded-lg border border-green-200 bg-green-50 text-green-800 px-4 py-3">
+                {{ session('success') }}
+              </div>
+            @endif
 
-    @if (session('error'))
-      <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
-        {{ session('error') }}
-      </div>
-    @endif
+            @if (session('error'))
+              <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
+                {{ session('error') }}
+              </div>
+            @endif
 
-    @if ($errors->any())
-      <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
-        <ul class="list-disc pl-5 space-y-1">
-          @foreach ($errors->all() as $e)
-            <li>{{ $e }}</li>
-          @endforeach
-        </ul>
-      </div>
-    @endif
-  @endonce
+            @if ($errors->any())
+              <div class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800 px-4 py-3">
+                <ul class="list-disc pl-5 space-y-1">
+                  @foreach ($errors->all() as $e)
+                    <li>{{ $e }}</li>
+                  @endforeach
+                </ul>
+              </div>
+            @endif
+          @endonce
 
-  @yield('content')
-</main>
-
+          @yield('content')
+        </main>
 
         {{-- Modal Global --}}
         <div id="modalOverlay" class="fixed inset-0 z-50 hidden">
@@ -185,6 +195,8 @@
             }
           });
         </script>
+        
+        @include('partials.toast')
 
         @stack('body-end')
       </div>

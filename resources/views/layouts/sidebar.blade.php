@@ -35,7 +35,7 @@
   @endphp
 
   {{-- NAV --}}
-  <nav class="p-3">
+  <nav class="p-3 flex-1">
     {{-- DASHBOARD --}}
     @can('dashboard.view')
       <div class="space-y-1">
@@ -104,50 +104,47 @@
         </div>
       </details>
     @endif
-  </nav>
 
-    {{-- FOOTER: BACKUP CSV (tetap di bawah) --}}
-  @if (Route::has('backup.csv'))
-    @can('backup.download')
-      <div class="mt-auto p-3 border-t border-gray-200 dark:border-gray-700">
-        <details class="group">
-          <summary class="flex items-center justify-between cursor-pointer px-3 py-2 rounded-lg
-                          text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-gray-700/70">
-            <span class="inline-flex items-center gap-2">
-              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" />
+    {{-- BACKUP CSV (tepat di bawah Inventory) --}}
+    @if (Route::has('backup.csv'))
+      @can('backup.download')
+        <details class="group mt-4">
+          <summary
+            class="flex items-center justify-between cursor-pointer px-3 py-2 rounded-lg
+                   {{ $isInvGrp ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-gray-700/70' }}">
+            <span class="inline-flex items-center gap-3">
+              <svg class="h-5 w-5 text-white" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 3a1 1 0 0 1 1 1v9.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4.007 4.007a1 1 0 0 1-1.414 0L7.279 12.707a1 1 0 0 1 1.414-1.414L11 13.586V4a1 1 0 0 1 1-1z"/>
+                <path d="M5 19a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-2a1 1 0 1 0-2 0v2H7v-2a1 1 0 1 0-2 0v2z"/>
               </svg>
               <span>Backup CSV</span>
             </span>
-            <svg class="h-4 w-4 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <svg class="h-4 w-4 text-white transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M9 5l7 7-7 7"/>
             </svg>
           </summary>
 
-          <div class="mt-2 ml-7 flex flex-col gap-1 text-sm">
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'asset_pc']) }}">PC</a>
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'asset_printer']) }}">Printer</a>
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'asset_proyektor']) }}">Proyektor</a>
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'asset_ac']) }}">AC</a>
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'inventory_hardware']) }}">Hardware</a>
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'inventory_labkom']) }}">Labkom</a>
-            {{-- Opsional: history --}}
-            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
-               href="{{ route('backup.csv', ['table' => 'asset_history']) }}">History</a>
+          <div class="mt-2 ml-9 flex flex-col gap-1">
+            <a href="{{ route('backup.csv',['table'=>'asset_pc']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">PC</a>
+            <a href="{{ route('backup.csv',['table'=>'asset_printer']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">Printer</a>
+            <a href="{{ route('backup.csv',['table'=>'asset_proyektor']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">Proyektor</a>
+            <a href="{{ route('backup.csv',['table'=>'asset_ac']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">AC</a>
+            <a href="{{ route('backup.csv',['table'=>'inventory_hardware']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">Hardware</a>
+            <a href="{{ route('backup.csv',['table'=>'inventory_labkom']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">Labkom</a>
+            <a href="{{ route('backup.csv',['table'=>'asset_history']) }}"
+               class="px-3 py-2 rounded-lg text-sm text-white/90 hover:text-white hover:bg-gray-800">History</a>
+
+            <p class="mt-2 text-[11px] text-white/70">Klik untuk mengunduh CSV per tabel.</p>
           </div>
-
-          <p class="mt-3 text-[11px] text-gray-500 dark:text-gray-400 px-3">
-            Klik untuk mengunduh CSV per tabel.
-          </p>
         </details>
-      </div>
-    @endcan
-  @endif
-
+      @endcan
+    @endif
+    {{-- /BACKUP CSV --}}
+  </nav>
 </aside>

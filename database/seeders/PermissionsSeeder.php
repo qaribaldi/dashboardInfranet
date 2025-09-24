@@ -60,9 +60,15 @@ class PermissionsSeeder extends Seeder
             'dashboard.history.ac',
         ];
 
-        // >>> Backup (baru)
+        // Backup
         $backupPerms = [
             'backup.download',
+        ];
+
+        //landing page
+        $siteInfoPerms = [
+            'siteinfo.view',
+            'siteinfo.manage',
         ];
 
         // Buat semua permission
@@ -72,7 +78,8 @@ class PermissionsSeeder extends Seeder
             $perEntityColumns,
             $dashboardPerms,
             $dashboardHistoryPerType,
-            $backupPerms // ← ditambahkan
+            $backupPerms,
+            $siteInfoPerms
         ) as $name) {
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }

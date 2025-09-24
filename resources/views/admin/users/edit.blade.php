@@ -183,6 +183,19 @@
   </p>
 </fieldset>
 
+    {{-- ===== LANDING PAGE ===== --}}
+    <fieldset class="border rounded-xl p-4">
+      <legend class="px-2 text-sm font-semibold uppercase text-gray-600">Edit Landing Page</legend>
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+        {!! $cb('siteinfo.view', 'siteinfo.view (Lihat halaman edit)') !!}
+        {!! $cb('siteinfo.manage', 'siteinfo.manage (Buat/Ubah konten landing)') !!}
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Beri <b>siteinfo.manage</b> untuk mengizinkan user mengubah konten pada landing page.
+      </p>
+    </fieldset>
+
+
 
     <div class="flex items-center gap-3">
       <button class="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-black">Simpan</button>
