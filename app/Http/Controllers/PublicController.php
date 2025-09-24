@@ -9,7 +9,7 @@ class PublicController extends Controller
     // tampilkan landing (publik)
     public function landing()
     {
-        $info = SiteInfo::first(); // bisa null kalau belum ada
+        $info = SiteInfo::first(); 
         return view('landing', compact('info'));
     }
 

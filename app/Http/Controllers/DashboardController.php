@@ -60,21 +60,23 @@ class DashboardController extends Controller
             }
         };
 
-        // ===== Totals (PC gabungan: AssetPc + InventoryLabkom) =====
-        $totalPcNonLab   = AssetPc::count();
-        $totalPcLabkom   = InventoryLabkom::count();
-        $totalPcCombined = $totalPcNonLab + $totalPcLabkom;
+        // ===== Totals (DIREVISI) =====
+        // PC asset saja
+        $assetPcTotal = AssetPc::count();
 
-        // Labkom unik (berdasarkan nama_lab)
-        $totalLabkom = InventoryLabkom::whereNotNull('nama_lab')
+        // PC Labkom (distinct id_pc supaya tidak double-count)
+        $labkomPcTotal = InventoryLabkom::whereNotNull('id_pc')
+            ->distinct('id_pc')
+            ->count('id_pc');
+
+        // (opsional) jumlah lab unik berdasarkan nama_lab (untuk UI lain jika diperlukan)
+        $totalLabkomUnik = InventoryLabkom::whereNotNull('nama_lab')
             ->distinct('nama_lab')
             ->count('nama_lab');
 
         $totalPrinter   = AssetPrinter::count();
         $totalProyektor = AssetProyektor::count();
         $totalAc        = AssetAc::count();
-
-        
 
         // Old per bucket (gabungan untuk PC)
         $oldPcNonLab = $applyYearRange(AssetPc::whereNotNull('tahun_pembelian'), 'tahun_pembelian')->count();
@@ -83,8 +85,8 @@ class DashboardController extends Controller
 
         // Old Labkom: hitung DISTINCT nama_lab di rentang umur
         $oldLabkom = $applyYearRange(
-        InventoryLabkom::whereNotNull('tahun_pembelian')->whereNotNull('nama_lab'),
-        'tahun_pembelian'
+            InventoryLabkom::whereNotNull('tahun_pembelian')->whereNotNull('nama_lab'),
+            'tahun_pembelian'
         )
         ->distinct('nama_lab')
         ->count('nama_lab');
@@ -116,10 +118,10 @@ class DashboardController extends Controller
             ],
         ];
 
-        // Pie chart — PC = PC biasa + PC Labkom (gabungan)
+        // Pie chart — PC dari asset saja (DIREVISI)
         $pie = [
             'labels' => ['PC','Printer','Proyektor','AC'],
-            'data'   => [$totalPcCombined, $totalPrinter, $totalProyektor, $totalAc],
+            'data'   => [$assetPcTotal, $totalPrinter, $totalProyektor, $totalAc],
         ];
 
         // === AGREGASI STORAGE UNTUK PC (SSD/HDD) ===
@@ -405,87 +407,87 @@ class DashboardController extends Controller
         ];
 
         // ===== HISTORI (per bulan atau 30 hari, WIB) =====
-$historyMonth = trim((string) $request->input('history_month', '')); // format 'YYYY-MM' atau ''
-$periodLabel  = '30 hari'; // default label untuk judul
-$histQuery    = AssetHistory::query();
+        $historyMonth = trim((string) $request->input('history_month', '')); // format 'YYYY-MM' atau ''
+        $periodLabel  = '30 hari'; // default label untuk judul
+        $histQuery    = AssetHistory::query();
 
-if ($historyMonth !== '') {
-    // Jika user pilih bulan tertentu → filter range 1 s/d akhir bulan tsb
-    try {
-        [$y, $m] = explode('-', $historyMonth);
-        $start = Carbon::createFromDate((int)$y, (int)$m, 1, 'Asia/Jakarta')->startOfMonth();
-        $end   = $start->copy()->endOfMonth();
-        $histQuery->whereBetween('created_at', [$start, $end]);
+        if ($historyMonth !== '') {
+            // Jika user pilih bulan tertentu → filter range 1 s/d akhir bulan tsb
+            try {
+                [$y, $m] = explode('-', $historyMonth);
+                $start = Carbon::createFromDate((int)$y, (int)$m, 1, 'Asia/Jakarta')->startOfMonth();
+                $end   = $start->copy()->endOfMonth();
+                $histQuery->whereBetween('created_at', [$start, $end]);
 
-        // Label periode, contoh: "September 2025"
-        $periodLabel = $start->locale('id')->translatedFormat('F Y');
-    } catch (\Throwable $e) {
-        // fallback ke 30 hari terakhir jika parsing gagal
-        $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
-        $periodLabel = '30 hari';
-    }
-} else {
-    // Default: 30 hari terakhir
-    $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
-    $periodLabel = '30 hari';
-}
-
-$user = auth()->user();
-
-$canHistory = $user->can('dashboard.view.history');
-
-$histMap = [
-    'PC'        => 'dashboard.history.pc',
-    'PRINTER'   => 'dashboard.history.printer',
-    'PROYEKTOR' => 'dashboard.history.proyektor',
-    'AC'        => 'dashboard.history.ac',
-];
-
-$allowedTypes = [];
-foreach ($histMap as $type => $perm) {
-    if ($user->can($perm)) {
-        $allowedTypes[] = $type;
-    }
-}
-
-$historyDenied = false;
-
-if (! $canHistory || empty($allowedTypes)) {
-    $historyDenied = true;
-    $history = collect();
-} else {
-    $histQuery->whereIn(DB::raw('UPPER(asset_type)'), $allowedTypes);
-    $history = $histQuery
-        ->orderBy('created_at','desc')
-        ->limit(200)
-        ->get()
-        ->map(function($h) {
-            $details = [];
-            $changes = $h->changes_json ?? [];
-            if (is_array($changes)) {
-                foreach ($changes as $k => $pair) {
-                    $from = $pair['from'] ?? null;
-                    $to   = $pair['to'] ?? null;
-                    $details[] = "{$k}: ".($from ?? '-')." → ".($to ?? '-');
-                }
+                // Label periode, contoh: "September 2025"
+                $periodLabel = $start->locale('id')->translatedFormat('F Y');
+            } catch (\Throwable $e) {
+                // fallback ke 30 hari terakhir jika parsing gagal
+                $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
+                $periodLabel = '30 hari';
             }
+        } else {
+            // Default: 30 hari terakhir
+            $histQuery->where('created_at','>=',$nowJakarta->copy()->subDays(30));
+            $periodLabel = '30 hari';
+        }
 
-            $raw = $h->getRawOriginal('created_at');
-            $tsEpoch = $raw 
-                ? Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'Asia/Jakarta')->getTimestamp() * 1000
-                : null;
+        $user = auth()->user();
 
-            return [
-                'ts_epoch'   => $tsEpoch,
-                'asset_type' => strtoupper($h->asset_type),
-                'asset_id'   => $h->asset_id,
-                'action'     => $h->action,
-                'note'       => $h->note,
-                'summary'    => implode('; ', $details),
-                'edited_by'  => $h->edited_by ?? '-',
-            ];
-        });
-}
+        $canHistory = $user->can('dashboard.view.history');
+
+        $histMap = [
+            'PC'        => 'dashboard.history.pc',
+            'PRINTER'   => 'dashboard.history.printer',
+            'PROYEKTOR' => 'dashboard.history.proyektor',
+            'AC'        => 'dashboard.history.ac',
+        ];
+
+        $allowedTypes = [];
+        foreach ($histMap as $type => $perm) {
+            if ($user->can($perm)) {
+                $allowedTypes[] = $type;
+            }
+        }
+
+        $historyDenied = false;
+
+        if (! $canHistory || empty($allowedTypes)) {
+            $historyDenied = true;
+            $history = collect();
+        } else {
+            $histQuery->whereIn(DB::raw('UPPER(asset_type)'), $allowedTypes);
+            $history = $histQuery
+                ->orderBy('created_at','desc')
+                ->limit(200)
+                ->get()
+                ->map(function($h) {
+                    $details = [];
+                    $changes = $h->changes_json ?? [];
+                    if (is_array($changes)) {
+                        foreach ($changes as $k => $pair) {
+                            $from = $pair['from'] ?? null;
+                            $to   = $pair['to'] ?? null;
+                            $details[] = "{$k}: ".($from ?? '-')." → ".($to ?? '-');
+                        }
+                    }
+
+                    $raw = $h->getRawOriginal('created_at');
+                    $tsEpoch = $raw 
+                        ? Carbon::createFromFormat('Y-m-d H:i:s', $raw, 'Asia/Jakarta')->getTimestamp() * 1000
+                        : null;
+
+                    return [
+                        'ts_epoch'   => $tsEpoch,
+                        'asset_type' => strtoupper($h->asset_type),
+                        'asset_id'   => $h->asset_id,
+                        'action'     => $h->action,
+                        'note'       => $h->note,
+                        'summary'    => implode('; ', $details),
+                        'edited_by'  => $h->edited_by ?? '-',
+                    ];
+                });
+        }
 
         // Judul panel lokasi
         $lokTitleMap = [
@@ -508,14 +510,22 @@ if (! $canHistory || empty($allowedTypes)) {
                 'label' => $ageLabel,
             ],
             'totals' => [
-                'pc'        => $totalPcCombined, // PC gabungan
-                'labkom'    => $totalLabkom,   // 👈 NEW: kartu khusus Labkom
-                'printer'   => $totalPrinter,
-                'proyektor' => $totalProyektor,
-                'ac'        => $totalAc,
+                // DIREVISI: pc hanya dari asset
+                'pc'          => $assetPcTotal,
+
+                // DIREVISI: total PC Labkom (distinct id_pc)
+                'pc_labkom'   => $labkomPcTotal,
+
+                // (opsional) jumlah lab unik untuk kebutuhan lain di UI
+                'labkom_unik' => $totalLabkomUnik,
+
+                'printer'     => $totalPrinter,
+                'proyektor'   => $totalProyektor,
+                'ac'          => $totalAc,
                 'old' => [
-                    'pc'        => $oldPc,        // PC gabungan
-                    'labkom'    => $oldLabkom,  // 👈 NEW: old Labkom
+                    // Tetap: PC gabungan (asset + labkom) untuk kandidat upgrade
+                    'pc'        => $oldPc,
+                    'labkom'    => $oldLabkom,
                     'printer'   => $oldPrinter,
                     'proyektor' => $oldProyektor,
                     'ac'        => $oldAc,
@@ -531,9 +541,9 @@ if (! $canHistory || empty($allowedTypes)) {
             'lokasi_rawan_labkom'  => $lokasiRawanLabkom,
             'lokasi_labkom_title'  => $lokasiLabkomTitle,
             'history'              => $history,
-            'history_denied' => $historyDenied,
-            'history_month'         => $historyMonth,
-            'history_period_label'  => $historyMonth !== '' ? $periodLabel : '30 hari',
+            'history_denied'       => $historyDenied,
+            'history_month'        => $historyMonth,
+            'history_period_label' => $historyMonth !== '' ? $periodLabel : '30 hari',
             'filters' => [
                 'lokasi_options'   => $lokasiOptions,
                 'spes_options'     => $spesOptions,

@@ -60,8 +60,20 @@ class PermissionsSeeder extends Seeder
             'dashboard.history.ac',
         ];
 
+        // >>> Backup (baru)
+        $backupPerms = [
+            'backup.download',
+        ];
+
         // Buat semua permission
-        foreach (array_merge($inventoryCrud, $perEntityImportExport, $perEntityColumns, $dashboardPerms, $dashboardHistoryPerType) as $name) {
+        foreach (array_merge(
+            $inventoryCrud,
+            $perEntityImportExport,
+            $perEntityColumns,
+            $dashboardPerms,
+            $dashboardHistoryPerType,
+            $backupPerms // ← ditambahkan
+        ) as $name) {
             Permission::firstOrCreate(['name' => $name, 'guard_name' => 'web']);
         }
 
@@ -69,14 +81,12 @@ class PermissionsSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $user  = Role::firstOrCreate(['name' => 'user',  'guard_name' => 'web']);
 
-        // Admin dapat semua
+        // Admin dapat semua (termasuk backup.download)
         $admin->syncPermissions(Permission::all());
 
-        // USER DEFAULT: hanya dashboard basic (ubah sesuai kebijakan)
+        // USER DEFAULT: hanya dashboard basic (opsional)
         $userDefaultPerms = [
             'dashboard.view',
-            // Jika ingin user baru juga bisa lihat lokasi rawan, tambahkan:
-            // 'dashboard.view.lokasi-rawan',
         ];
         $user->syncPermissions(Permission::whereIn('name', $userDefaultPerms)->get());
     }

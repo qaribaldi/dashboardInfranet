@@ -171,6 +171,19 @@
       </div>
     </fieldset>
 
+    {{-- ===== BACKUP ===== --}}
+<fieldset class="border rounded-xl p-4">
+  <legend class="px-2 text-sm font-semibold uppercase text-gray-600">Backup</legend>
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3">
+    {!! $cb('backup.download', 'backup.download (Unduh semua CSV)') !!}
+  </div>
+  <p class="text-xs text-gray-500 mt-2">
+    Izin ini menampilkan tombol "Backup Data (CSV)" di sidebar dan mengizinkan akses rute
+    <code>/backup/download</code>.
+  </p>
+</fieldset>
+
+
     <div class="flex items-center gap-3">
       <button class="px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-black">Simpan</button>
       <a href="{{ route('admin.users.index') }}" class="px-4 py-2 rounded-lg border hover:bg-gray-50">Batal</a>

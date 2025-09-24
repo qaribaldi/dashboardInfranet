@@ -48,42 +48,29 @@
       scroll-snap-type: x mandatory;
       padding: 0 2px;
     }
-    /* pas-kan 3 kartu per viewport:
-       Ada 2 gap di antara 3 kartu => 2 * 16 = 32px */
     .kpi-card {
       flex: 0 0 calc((100% - 32px) / 3);
       scroll-snap-align: center;
     }
-    /* tombol prev/next */
     .kpi-nav-btn{
-  position:absolute; top:50%; transform:translateY(-50%);
-  z-index:10;
-  width:36px; height:36px;
-  border-radius:9999px;
-  display:flex; align-items:center; justify-content:center;
-
-  /* transparansi */
-  background: rgba(255,255,255,.35);
-  border: 1px solid rgba(0,0,0,.06);
-  color: rgba(17,24,39,.8);
-  backdrop-filter: blur(4px);
-
-  /* animasi halus */
-  opacity: .6;
-  transition: opacity .2s ease, background-color .2s ease, transform .15s ease;
-}
-.kpi-nav-btn:hover,
-.kpi-nav-btn:focus{
-  background: rgba(255,255,255,.9);
-  opacity: 1;
-}
-.kpi-nav-left{ left: -6px; }
-.kpi-nav-right{ right: -6px; }
-
-    @media (max-width: 1024px) {
-      /* di layar kecil tetap 3 per slide, tapi kartu sedikit lebih sempit */
-      .kpi-card { flex: 0 0 calc((100% - 32px) / 3); }
+      position:absolute; top:50%; transform:translateY(-50%);
+      z-index:10;
+      width:36px; height:36px;
+      border-radius:9999px;
+      display:flex; align-items:center; justify-content:center;
+      background: rgba(255,255,255,.35);
+      border: 1px solid rgba(0,0,0,.06);
+      color: rgba(17,24,39,.8);
+      backdrop-filter: blur(4px);
+      opacity: .6;
+      transition: opacity .2s ease, background-color .2s ease, transform .15s ease;
     }
+    .kpi-nav-btn:hover,
+    .kpi-nav-btn:focus{ background: rgba(255,255,255,.9); opacity: 1; }
+    .kpi-nav-left{ left: -6px; }
+    .kpi-nav-right{ right: -6px; }
+
+    @media (max-width: 1024px) { .kpi-card { flex: 0 0 calc((100% - 32px) / 3); } }
   </style>
 
   <div class="relative mb-6">
@@ -93,17 +80,19 @@
         <div class="kpi-card rounded-xl border bg-white p-4">
           <div class="text-sm text-gray-500">Total Keseluruhan Aset</div>
           <div id="kpiAll" class="text-2xl font-extrabold">-</div>
-          <div class="text-xs text-gray-500 mt-1">PC (termasuk Labkom) + Printer + Proyektor + AC</div>
+          <div class="text-xs text-gray-500 mt-1">
+            PC (Asset) + <span class="whitespace-nowrap">PC Labkom</span> + Printer + Proyektor + AC
+          </div>
         </div>
 
         <div class="kpi-card rounded-xl border bg-white p-4">
-          <div class="text-sm text-gray-500">Total Labkom</div>
+          <div class="text-sm text-gray-500">Total PC Labkom</div>
           <div id="kpiLabkom" class="text-2xl font-bold">-</div>
           <div class="text-xs text-gray-500 mt-1">Umur <span class="ageLabel">5</span> th: <span id="kpiLabkomOld">-</span></div>
         </div>
 
         <div class="kpi-card rounded-xl border bg-white p-4">
-          <div class="text-sm text-gray-500">Total PC</div>
+          <div class="text-sm text-gray-500">Total PC (Asset)</div>
           <div id="kpiPc" class="text-2xl font-bold">-</div>
           <div class="text-xs text-gray-500 mt-1">Umur <span id="ageLabelKpi">5</span> th: <span id="kpiPcOld">-</span></div>
         </div>
@@ -284,31 +273,30 @@
   {{-- Histori --}}
   @can('dashboard.view.history')
     <div class="border-b px-4 py-3 flex items-center justify-between">
-  <h3 class="font-semibold">
-    Histori Perbaikan/Upgrade (<span id="hisPeriod">-</span>)
-  </h3>
+      <h3 class="font-semibold">
+        Histori Perbaikan/Upgrade (<span id="hisPeriod">-</span>)
+      </h3>
 
-  <div class="flex items-center gap-3">
-    {{-- Periode (bulan) --}}
-    <div class="flex items-center gap-2">
-      <label for="hisMonth" class="text-xs text-gray-600">Periode</label>
-      <input type="month" id="hisMonth" class="rounded border px-2 py-1 text-sm">
+      <div class="flex items-center gap-3">
+        {{-- Periode (bulan) --}}
+        <div class="flex items-center gap-2">
+          <label for="hisMonth" class="text-xs text-gray-600">Periode</label>
+          <input type="month" id="hisMonth" class="rounded border px-2 py-1 text-sm">
+        </div>
+
+        {{-- Tipe aset --}}
+        <div class="flex items-center gap-2">
+          <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
+          <select id="hisType" class="rounded border px-2 py-1 text-sm">
+            <option value="ALL" selected>Semua</option>
+            <option value="PC">PC</option>
+            <option value="Printer">Printer</option>
+            <option value="Proyektor">Proyektor</option>
+            <option value="AC">AC</option>
+          </select>
+        </div>
+      </div>
     </div>
-
-    {{-- Tipe aset --}}
-    <div class="flex items-center gap-2">
-      <label for="hisType" class="text-xs text-gray-600">Tipe Aset</label>
-      <select id="hisType" class="rounded border px-2 py-1 text-sm">
-        <option value="ALL" selected>Semua</option>
-        <option value="PC">PC</option>
-        <option value="Printer">Printer</option>
-        <option value="Proyektor">Proyektor</option>
-        <option value="AC">AC</option>
-      </select>
-    </div>
-  </div>
-</div>
-
 
       <div class="p-4 overflow-x-auto">
         <table class="min-w-full text-sm">
@@ -379,7 +367,7 @@
   let historyFiltered = [];
   let hisType = 'ALL';
   let pageHistory = 1;
-  let historyMonth = ''; 
+  let historyMonth = '';
 
   let assetType = 'ALL';
   let filterField = '';
@@ -493,8 +481,8 @@
   function setText(id, val) { const el=document.getElementById(id); if (el) el.textContent = val; }
 
   function updateKpis(m) {
-    // NEW: kartu Labkom
-    setText('kpiLabkom', m.totals?.labkom ?? '-');
+    // REVISI: kartu PC Labkom pakai totals.pc_labkom
+    setText('kpiLabkom', m.totals?.pc_labkom ?? '-');
     setText('kpiLabkomOld', m.totals?.old?.labkom ?? '-');
 
     setText('kpiPc', m.totals?.pc ?? '-');
@@ -502,8 +490,13 @@
     setText('kpiProyektor', m.totals?.proyektor ?? '-');
     setText('kpiAc', m.totals?.ac ?? '-');
 
-    // Total keseluruhan: PC (gabungan, sudah termasuk Labkom) + lainnya
-    const totalAll = (m.totals?.pc || 0)+(m.totals?.printer || 0)+(m.totals?.proyektor || 0)+(m.totals?.ac || 0);
+    // REVISI: Total keseluruhan = PC Asset + PC Labkom + lainnya
+    const totalAll =
+      (m.totals?.pc || 0) +
+      (m.totals?.pc_labkom || 0) +
+      (m.totals?.printer || 0) +
+      (m.totals?.proyektor || 0) +
+      (m.totals?.ac || 0);
     setText('kpiAll', totalAll);
 
     setText('kpiPcOld', m.totals?.old?.pc ?? '-');
@@ -823,30 +816,29 @@
 
   // History
   function updateHistory(m) {
-  const body = document.getElementById('historyBody');
-  if (!body) return;
+    const body = document.getElementById('historyBody');
+    if (!body) return;
 
-  const lbl = document.getElementById('hisPeriod');
-  if (lbl) lbl.textContent = m.history_period_label || '30 hari';
+    const lbl = document.getElementById('hisPeriod');
+    if (lbl) lbl.textContent = m.history_period_label || '30 hari';
 
-  // === Jika akses ditolak ===
-  if (m.history_denied) {
-    body.innerHTML = `<tr><td colspan="6" 
-      class="px-3 py-4 text-center text-red-600">
-      Anda tidak memiliki akses untuk melihat tabel ini. 
-      Minta admin untuk memberikan anda akses.
-    </td></tr>`;
-    document.getElementById('hisPageInfo').textContent = `0 / 0`;
-    historyAll = [];
-    historyFiltered = [];
-    return;
+    // Jika akses ditolak
+    if (m.history_denied) {
+      body.innerHTML = `<tr><td colspan="6" 
+        class="px-3 py-4 text-center text-red-600">
+        Anda tidak memiliki akses untuk melihat tabel ini. 
+        Minta admin untuk memberikan anda akses.
+      </td></tr>`;
+      document.getElementById('hisPageInfo').textContent = `0 / 0`;
+      historyAll = [];
+      historyFiltered = [];
+      return;
+    }
+
+    // Normal
+    historyAll = Array.isArray(m.history) ? m.history : [];
+    applyHistoryFilter(true);
   }
-
-  // === Normal: render data histori ===
-  historyAll = Array.isArray(m.history) ? m.history : [];
-  applyHistoryFilter(true);
-}
-
 
   function applyHistoryFilter(resetPage = true) {
     const sel = document.getElementById('hisType');
@@ -865,23 +857,22 @@
   }
 
   function renderHistoryPage(list) {
-  const body = document.getElementById('historyBody');
-  if (!body) return;
+    const body = document.getElementById('historyBody');
+    if (!body) return;
 
-  const total = list.length;
-  const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
-  pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
+    const total = list.length;
+    const maxPage = Math.max(1, Math.ceil(total / HISTORY_PAGE_SIZE));
+    pageHistory = Math.min(Math.max(1, pageHistory), maxPage);
 
-  document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
+    document.getElementById('hisPageInfo').textContent = `${pageHistory} / ${maxPage}`;
 
-  // === Jika data kosong tapi bukan karena akses ditolak ===
-  if (!total) {
-    body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
-      Tidak ada histori pada periode ini.
-    </td></tr>`;
-    document.getElementById('hisPageInfo').textContent = `0 / 0`;
-    return;
-  }
+    if (!total) {
+      body.innerHTML = `<tr><td colspan="6" class="px-3 py-4 text-center text-gray-500">
+        Tidak ada histori pada periode ini.
+      </td></tr>`;
+      document.getElementById('hisPageInfo').textContent = `0 / 0`;
+      return;
+    }
 
     const start = (pageHistory - 1) * HISTORY_PAGE_SIZE;
     const rows = list.slice(start, start + HISTORY_PAGE_SIZE);
@@ -919,7 +910,7 @@
     });
   }
 
-  // KPI pager: 3 kartu per slide, tombol + auto-loop 5s
+  // KPI pager
   function initKpiPager(){
     const track = document.getElementById('kpiCarousel');
     const prev  = document.getElementById('kpiPrev');
@@ -939,10 +930,7 @@
     prev.addEventListener('click', () => goto(page - 1));
     next.addEventListener('click', () => goto(page + 1));
 
-    // auto slide tiap 5 detik
     setInterval(() => goto(page + 1), 5000);
-
-    // jaga posisi saat resize
     window.addEventListener('resize', () => goto(page));
   }
 
@@ -1028,7 +1016,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     initCharts();
-    initKpiPager(); // 🔥 aktifkan pager KPI (3 per slide, auto 5s)
+    initKpiPager();
 
     const btnProc = document.getElementById('modeProc');
     const btnUpg  = document.getElementById('modeUpg');
@@ -1046,19 +1034,17 @@
     }
 
     const hisMonthInput = document.getElementById('hisMonth');
+    if (hisMonthInput) {
+      hisMonthInput.addEventListener('change', () => {
+        historyMonth = hisMonthInput.value || '';
+        fetchMetrics();
+      });
+    }
 
-if (hisMonthInput) {
-  hisMonthInput.addEventListener('change', () => {
-    historyMonth = hisMonthInput.value || '';
-    fetchMetrics();
-  });
-}
-
-// ▶️ Filter Tipe Aset (Histori): render ulang saat berubah
-const hisTypeSel = document.getElementById('hisType');
-if (hisTypeSel) {
-  hisTypeSel.addEventListener('change', () => applyHistoryFilter(true));
-}
+    const hisTypeSel = document.getElementById('hisType');
+    if (hisTypeSel) {
+      hisTypeSel.addEventListener('change', () => applyHistoryFilter(true));
+    }
 
     const cRam = document.getElementById('chkRamLow');
     const cHdd = document.getElementById('chkHddOnly');
@@ -1103,31 +1089,30 @@ if (hisTypeSel) {
   });
 
   async function fetchMetrics() {
-  let url = "{{ route('dashboard.metrics') }}"
-    + `?min_age=${minAge}`
-    + `&pc_ram_low=${pcRamLow ? 1 : 0}`
-    + `&pc_hdd_only=${pcHddOnly ? 1 : 0}`;
+    let url = "{{ route('dashboard.metrics') }}"
+      + `?min_age=${minAge}`
+      + `&pc_ram_low=${pcRamLow ? 1 : 0}`
+      + `&pc_hdd_only=${pcHddOnly ? 1 : 0}`;
 
-  if (historyMonth) {
-    url += `&history_month=${encodeURIComponent(historyMonth)}`;
+    if (historyMonth) {
+      url += `&history_month=${encodeURIComponent(historyMonth)}`;
+    }
+
+    try {
+      const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
+      const metrics = await res.json();
+
+      lastMetrics = metrics;
+      updateKpis(metrics);
+      updateBar(metrics);
+      updatePie(metrics);
+      updateUpgradeTable(metrics);
+      updateLokasiRawan(metrics);
+      updateLokasiRawanLabkom(metrics);
+      updateHistory(metrics);
+    } catch (e) {
+      console.error(e);
+    }
   }
-
-  try {
-    const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }});
-    const metrics = await res.json();
-
-    lastMetrics = metrics;
-    updateKpis(metrics);
-    updateBar(metrics);
-    updatePie(metrics);
-    updateUpgradeTable(metrics);
-    updateLokasiRawan(metrics);
-    updateLokasiRawanLabkom(metrics);
-    updateHistory(metrics);
-  } catch (e) {
-    console.error(e);
-  }
-}
-
 </script>
 @endpush

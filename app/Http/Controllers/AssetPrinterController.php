@@ -16,7 +16,7 @@ class AssetPrinterController extends Controller
     private string $table = 'asset_printer';
     private string $pk    = 'id_printer';
 
-    // Kolom standar sesuai tabel yang kamu kirim (+ timestamps bila ada)
+    // Kolom standar sesuai tabel (+ timestamps bila ada)
     private array $std = [
         'id_printer','unit_kerja','user','jabatan','ruang',
         'jenis_printer','merk','tipe','scanner','tinta',
@@ -41,10 +41,7 @@ class AssetPrinterController extends Controller
         $k = preg_replace('/[^a-z0-9_]/', '_', strtolower($k));
         $k = preg_replace('/_{2,}/', '_', trim($k, '_'));
 
-        // header kosong → skip (hindari kolom "x")
         if ($k === '') return '';
-
-        // jika diawali angka → prefix aman
         if (preg_match('/^\d/', $k)) $k = 'x_'.$k;
 
         return $k;
@@ -54,27 +51,24 @@ class AssetPrinterController extends Controller
     private function ensureColumns(array $defs): array
     {
         $added = [];
-    foreach ($defs as $d) {
-        $col      = $this->normalize($d['name'] ?? '');
-        $type     = $d['type'] ?? 'string';
-        $nullable = (bool)($d['nullable'] ?? true);
+        foreach ($defs as $d) {
+            $col      = $this->normalize($d['name'] ?? '');
+            $type     = $d['type'] ?? 'string';
+            $nullable = (bool)($d['nullable'] ?? true);
 
-        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
-        if (Schema::hasColumn($this->table, $col)) continue;
+            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+            if (in_array($col, $this->std, true)) continue; // lindungi kolom standar
+            if (Schema::hasColumn($this->table, $col)) continue;
 
-        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-            $method = self::TYPE_MAP[$type];
-            $colDef = $table->{$method}($col);
+            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+                $method = self::TYPE_MAP[$type];
+                $colDef = $table->{$method}($col);
+                if ($nullable) $colDef->nullable();
+            });
 
-            if ($nullable) {
-                $colDef->nullable();
-            }
-        });
-
-        $added[] = $col;
-    }
-    return $added;
+            $added[] = $col;
+        }
+        return $added;
     }
 
     public function addColumn(Request $request)
@@ -95,68 +89,64 @@ class AssetPrinterController extends Controller
     }
 
     public function renameColumn(Request $request)
-{
-    $data = $request->validate([
-        'from' => ['required','string','max:64'],
-        'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
-    ]);
+    {
+        $data = $request->validate([
+            'from' => ['required','string','max:64'],
+            'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+        ]);
 
-    $from = $this->normalize($data['from']);
-    $to   = $this->normalize($data['to']);
+        $from = $this->normalize($data['from']);
+        $to   = $this->normalize($data['to']);
 
-    if ($from === '' || $to === '') {
-        return back()->with('error','Nama kolom tidak valid.');
+        if ($from === '' || $to === '') {
+            return back()->with('error','Nama kolom tidak valid.');
+        }
+
+        // lindungi kolom standar
+        if (in_array($from, $this->std, true)) {
+            return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+        }
+
+        if (!Schema::hasColumn($this->table, $from)) {
+            return back()->with('error',"Kolom '$from' tidak ditemukan.");
+        }
+        if (Schema::hasColumn($this->table, $to)) {
+            return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
+        }
+
+        // Renaming butuh doctrine/dbal
+        Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
+            $table->renameColumn($from, $to);
+        });
+
+        return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
     }
 
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($from, $protected, true)) {
-        return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+    /** DROP kolom dinamis */
+    public function dropColumn(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required','string','max:64'],
+        ]);
+
+        $col = $this->normalize($data['name']);
+        if ($col === '') return back()->with('error','Nama kolom tidak valid.');
+
+        // lindungi kolom standar
+        if (in_array($col, $this->std, true)) {
+            return back()->with('error','Tidak boleh menghapus kolom standar.');
+        }
+
+        if (!Schema::hasColumn($this->table, $col)) {
+            return back()->with('error',"Kolom '$col' tidak ditemukan.");
+        }
+
+        Schema::table($this->table, function (Blueprint $table) use ($col) {
+            $table->dropColumn($col);
+        });
+
+        return back()->with('success',"Kolom '$col' berhasil dihapus.");
     }
-
-    if (!Schema::hasColumn($this->table, $from)) {
-        return back()->with('error',"Kolom '$from' tidak ditemukan.");
-    }
-
-    if (Schema::hasColumn($this->table, $to)) {
-        return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
-    }
-
-    // Renaming butuh doctrine/dbal
-    // composer require doctrine/dbal
-    Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
-        $table->renameColumn($from, $to);
-    });
-
-    return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
-}
-
-/** DROP kolom dinamis */
-public function dropColumn(Request $request)
-{
-    $data = $request->validate([
-        'name' => ['required','string','max:64'],
-    ]);
-
-    $col = $this->normalize($data['name']);
-    if ($col === '') return back()->with('error','Nama kolom tidak valid.');
-
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($col, $protected, true)) {
-        return back()->with('error','Tidak boleh menghapus kolom standar.');
-    }
-
-    if (!Schema::hasColumn($this->table, $col)) {
-        return back()->with('error',"Kolom '$col' tidak ditemukan.");
-    }
-
-    Schema::table($this->table, function (Blueprint $table) use ($col) {
-        $table->dropColumn($col);
-    });
-
-    return back()->with('success',"Kolom '$col' berhasil dihapus.");
-}
 
     /** Kolom ekstra (hasil +Kolom) */
     private function extraColumns(): array
@@ -166,39 +156,37 @@ public function dropColumn(Request $request)
     }
 
     private function columnKinds(string $table): array
-{
-    $cols = \Schema::getColumnListing($table);
-    $dateCols = [];
-    $datetimeCols = [];
+    {
+        $cols = \Schema::getColumnListing($table);
+        $dateCols = [];
+        $datetimeCols = [];
 
-    try {
-        $sm = \DB::connection()->getDoctrineSchemaManager();
-        $dt = $sm->listTableDetails($table);
-        foreach ($cols as $c) {
-            $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
-            if ($t === 'date') $dateCols[] = $c;
-            if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        try {
+            $sm = \DB::connection()->getDoctrineSchemaManager();
+            $dt = $sm->listTableDetails($table);
+            foreach ($cols as $c) {
+                $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
+                if ($t === 'date') $dateCols[] = $c;
+                if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+            }
+        } catch (\Throwable $e) {
+            // fallback: tebak dari nama kolom kalau doctrine/dbal belum dipasang
+            foreach ($cols as $c) {
+                if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
+                if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+            }
         }
-    } catch (\Throwable $e) {
-        // fallback: tebak dari nama kolom kalau doctrine/dbal belum dipasang
-        foreach ($cols as $c) {
-            if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
-            if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
-        }
+
+        // jangan kirim timestamps
+        $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
+        $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+        return compact('dateCols','datetimeCols');
     }
-
-    // jangan kirim timestamps
-    $dateCols = array_values(array_diff($dateCols, ['created_at','updated_at']));
-    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
-
-    return compact('dateCols','datetimeCols');
-}
-
 
     // ================== LIST ==================
     public function index(Request $request)
     {
-        // Header kolom bawaan untuk table head (view tetap aman kalau sebagian tidak ada)
         $columns = [
             $this->pk          => 'ID Printer',
             'unit_kerja'       => 'Unit Kerja',
@@ -230,7 +218,7 @@ public function dropColumn(Request $request)
             });
         }
 
-        // Filter aman: hanya diterapkan jika kolomnya ada
+        // Filter aman: hanya jika kolomnya ada
         if ($jenis !== '' && Schema::hasColumn($this->table,'jenis_printer')) {
             $base->where('jenis_printer',$jenis);
         }
@@ -348,7 +336,7 @@ public function dropColumn(Request $request)
             }
             $userName = auth()->user()->name ?? 'System';
             AssetHistory::create([
-                'asset_type'   => 'printer',
+                'asset_type'   => 'PRINTER', // UPPERCASE
                 'asset_id'     => $printer->{$this->pk},
                 'action'       => 'update',
                 'changes_json' => $changes,
@@ -363,26 +351,37 @@ public function dropColumn(Request $request)
 
     public function destroy(AssetPrinter $printer)
     {
-        
         $userName = auth()->user()->name ?? 'System';
         AssetHistory::create([
-        'asset_type'   => 'printer',
-        'asset_id'     => $printer->{$this->pk},
-        'action'       => 'delete',
-        'changes_json' => null,
-        'note'         => null,
-        'edited_by'    => $userName, // 👈 ditambah
-        'created_at'   => now('Asia/Jakarta'),
-    ]);$printer->delete();
+            'asset_type'   => 'PRINTER', // UPPERCASE
+            'asset_id'     => $printer->{$this->pk},
+            'action'       => 'delete',
+            'changes_json' => null,
+            'note'         => null,
+            'edited_by'    => $userName,
+            'created_at'   => now('Asia/Jakarta'),
+        ]);
+
+        $printer->delete();
         return redirect()->route('inventory.printer.index')->with('success','Aset Printer berhasil dihapus.');
     }
 
     public function show(AssetPrinter $printer)
     {
-        return view('inventory.printer._detail', ['data' => $printer]);
+        // 🔥 kirim riwayat ke view detail
+        $histories = AssetHistory::whereRaw('UPPER(asset_type) = ?', ['PRINTER'])
+            ->where('asset_id', $printer->{$this->pk})
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        return view('inventory.printer._detail', [
+            'data'      => $printer,
+            'histories' => $histories,
+        ]);
     }
 
-    // ================== NEW: IMPORT CSV ==================
+    // ================== IMPORT CSV ==================
 
     /** Form import CSV */
     public function importForm()
@@ -436,7 +435,7 @@ public function dropColumn(Request $request)
     public function importStore(Request $request)
     {
         $data = $request->validate([
-            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'], // 5MB
+            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'],
             'mode' => ['required','in:upsert,insert_only'],
             'auto_add_columns' => ['nullable','boolean'],
         ]);
@@ -501,7 +500,7 @@ public function dropColumn(Request $request)
             }
         }
 
-        // Kolom yang boleh diisi (hindari created_at/updated_at)
+        // Kolom yang boleh diisi (hindari timestamps)
         $skip = ['created_at','updated_at'];
         $writable = array_values(array_diff($existingCols, $skip));
 

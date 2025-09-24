@@ -8,8 +8,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\DB;        
-use Illuminate\Support\Facades\Storage;   
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 
 class AssetAcController extends Controller
@@ -37,55 +37,44 @@ class AssetAcController extends Controller
         $k = Str::snake($name);
         $k = preg_replace('/[^a-z0-9_]/', '_', strtolower($k));
         $k = preg_replace('/_{2,}/', '_', trim($k, '_'));
-
-        // Jika kosong (mis. header CSV kosong/ekstra delimiter), kembalikan '' agar bisa di-skip
         if ($k === '') return '';
-
-        // Jika diawali angka, beri prefix aman
         if (preg_match('/^\d/', $k)) $k = 'x_'.$k;
-
         return $k;
     }
 
     /** Tambahkan kolom baru bila belum ada */
-    /** Tambahkan kolom baru bila belum ada */
     private function ensureColumns(array $defs): array
-{
-    $added = [];
+    {
+        $added = [];
+        foreach ($defs as $d) {
+            $col      = $this->normalize($d['name'] ?? '');
+            $type     = $d['type'] ?? 'string';
+            $nullable = (bool)($d['nullable'] ?? true);
 
-    foreach ($defs as $d) {
-        $col      = $this->normalize($d['name'] ?? '');
-        $type     = $d['type'] ?? 'string';
-        $nullable = (bool)($d['nullable'] ?? true);
+            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+            if (in_array($col, $this->std, true)) continue;
+            if (Schema::hasColumn($this->table, $col)) continue;
 
-        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-        if (in_array($col, $this->std, true)) continue;
-        if (Schema::hasColumn($this->table, $col)) continue;
-
-        // date/datetime WAJIB nullable agar aman untuk tabel yang sudah ada data
-        if ($type === 'date' || $type === 'datetime') {
-            $nullable = true;
-        }
-
-        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-            $method = self::TYPE_MAP[$type];
-            $colDef = $table->{$method}($col);
-
-            if ($nullable) {
-                $colDef->nullable();
+            // date/datetime sebaiknya nullable untuk tabel existing
+            if ($type === 'date' || $type === 'datetime') {
+                $nullable = true;
             }
-        });
 
-        $added[] = $col;
+            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+                $method = self::TYPE_MAP[$type];
+                $colDef = $table->{$method}($col);
+                if ($nullable) $colDef->nullable();
+            });
+
+            $added[] = $col;
+        }
+        return $added;
     }
-
-    return $added;
-}
 
     public function addColumn(Request $request)
     {
         $data = $request->validate([
-            'name'     => ['required','string','max:64','regex:/^[A-Za-z][A-Za-z0-9_]*$/'], // diperketat
+            'name'     => ['required','string','max:64','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
             'type'     => ['required','in:string,text,integer,boolean,date,datetime'],
             'nullable' => ['nullable','boolean'],
         ]);
@@ -106,97 +95,86 @@ class AssetAcController extends Controller
     }
 
     public function renameColumn(Request $request)
-{
-    $data = $request->validate([
-        'from' => ['required','string','max:64'],
-        'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
-    ]);
+    {
+        $data = $request->validate([
+            'from' => ['required','string','max:64'],
+            'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+        ]);
 
-    $from = $this->normalize($data['from']);
-    $to   = $this->normalize($data['to']);
+        $from = $this->normalize($data['from']);
+        $to   = $this->normalize($data['to']);
 
-    if ($from === '' || $to === '') {
-        return back()->with('error','Nama kolom tidak valid.');
-    }
-
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($from, $protected, true)) {
-        return back()->with('error','Tidak boleh mengubah nama kolom standar.');
-    }
-
-    if (!Schema::hasColumn($this->table, $from)) {
-        return back()->with('error',"Kolom '$from' tidak ditemukan.");
-    }
-
-    if (Schema::hasColumn($this->table, $to)) {
-        return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
-    }
-
-    // Renaming butuh doctrine/dbal
-    // composer require doctrine/dbal
-    Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
-        $table->renameColumn($from, $to);
-    });
-
-    return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
-}
-
-/** DROP kolom dinamis */
-public function dropColumn(Request $request)
-{
-    $data = $request->validate([
-        'name' => ['required','string','max:64'],
-    ]);
-
-    $col = $this->normalize($data['name']);
-    if ($col === '') return back()->with('error','Nama kolom tidak valid.');
-
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($col, $protected, true)) {
-        return back()->with('error','Tidak boleh menghapus kolom standar.');
-    }
-
-    if (!Schema::hasColumn($this->table, $col)) {
-        return back()->with('error',"Kolom '$col' tidak ditemukan.");
-    }
-
-    Schema::table($this->table, function (Blueprint $table) use ($col) {
-        $table->dropColumn($col);
-    });
-
-    return back()->with('success',"Kolom '$col' berhasil dihapus.");
-}
-
-private function columnKinds(string $table): array
-{
-    $cols = \Schema::getColumnListing($table);
-    $dateCols = [];
-    $datetimeCols = [];
-
-    try {
-        $sm = \DB::connection()->getDoctrineSchemaManager();
-        $dt = $sm->listTableDetails($table);
-        foreach ($cols as $c) {
-            $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
-            if ($t === 'date') $dateCols[] = $c;
-            if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        if ($from === '' || $to === '') {
+            return back()->with('error','Nama kolom tidak valid.');
         }
-    } catch (\Throwable $e) {
-        // fallback: tebak dari nama kolom kalau doctrine/dbal belum dipasang
-        foreach ($cols as $c) {
-            if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
-            if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+
+        if (in_array($from, $this->std, true)) {
+            return back()->with('error','Tidak boleh mengubah nama kolom standar.');
         }
+        if (!Schema::hasColumn($this->table, $from)) {
+            return back()->with('error',"Kolom '$from' tidak ditemukan.");
+        }
+        if (Schema::hasColumn($this->table, $to)) {
+            return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
+        }
+
+        // composer require doctrine/dbal
+        Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
+            $table->renameColumn($from, $to);
+        });
+
+        return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
     }
 
-    // jangan kirim timestamps
-    $dateCols = array_values(array_diff($dateCols, ['created_at','updated_at']));
-    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+    public function dropColumn(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required','string','max:64'],
+        ]);
 
-    return compact('dateCols','datetimeCols');
-}
+        $col = $this->normalize($data['name']);
+        if ($col === '') return back()->with('error','Nama kolom tidak valid.');
+
+        if (in_array($col, $this->std, true)) {
+            return back()->with('error','Tidak boleh menghapus kolom standar.');
+        }
+        if (!Schema::hasColumn($this->table, $col)) {
+            return back()->with('error',"Kolom '$col' tidak ditemukan.");
+        }
+
+        Schema::table($this->table, function (Blueprint $table) use ($col) {
+            $table->dropColumn($col);
+        });
+
+        return back()->with('success',"Kolom '$col' berhasil dihapus.");
+    }
+
+    private function columnKinds(string $table): array
+    {
+        $cols = \Schema::getColumnListing($table);
+        $dateCols = [];
+        $datetimeCols = [];
+
+        try {
+            $sm = \DB::connection()->getDoctrineSchemaManager();
+            $dt = $sm->listTableDetails($table);
+            foreach ($cols as $c) {
+                $t = $dt->getColumn($c)->getType()->getName();
+                if ($t === 'date') $dateCols[] = $c;
+                if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+            }
+        } catch (\Throwable $e) {
+            foreach ($cols as $c) {
+                if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
+                if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+            }
+        }
+
+        $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
+        $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+        return compact('dateCols','datetimeCols');
+    }
 
     // =============== INDEX ===============
     public function index(Request $request)
@@ -260,7 +238,7 @@ private function columnKinds(string $table): array
             $fields[$col] = ucwords(str_replace('_',' ',$col));
         }
         $statusOptions = config('inventory.status_options');
-        $kinds = $this->columnKinds($this->table); 
+        $kinds = $this->columnKinds($this->table);
 
         return view('inventory.ac.form', [
             'mode'=>'create',
@@ -279,7 +257,7 @@ private function columnKinds(string $table): array
         $request->validate([
             $this->pk => 'required|string|unique:'.$this->table.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
-            'status'            => 'nullable|in:In use,In store,Service',
+            'status'          => 'nullable|in:In use,In store,Service',
         ]);
 
         $input = $request->only($writable);
@@ -299,7 +277,7 @@ private function columnKinds(string $table): array
         }
 
         $statusOptions = config('inventory.status_options');
-        $kinds = $this->columnKinds($this->table); 
+        $kinds = $this->columnKinds($this->table);
 
         return view('inventory.ac.form', [
             'mode'=>'edit',
@@ -318,7 +296,7 @@ private function columnKinds(string $table): array
         $request->validate([
             $this->pk => 'required|string|unique:'.$this->table.','.$this->pk.','.$ac->{$this->pk}.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
-            'status'            => 'nullable|in:In use,In store,Service',
+            'status'          => 'nullable|in:In use,In store,Service',
         ]);
 
         $input  = $request->only($writable);
@@ -333,10 +311,12 @@ private function columnKinds(string $table): array
             foreach ($dirty as $k => $newVal) {
                 $changes[$k] = ['from' => $before[$k] ?? null, 'to' => $newVal];
             }
+
             $userName = auth()->user()->name ?? 'System';
+
             AssetHistory::create([
                 'asset_type'   => 'ac',
-                'asset_id'     => $ac->id_ac,
+                'asset_id'     => $ac->{$this->pk},
                 'action'       => 'update',
                 'changes_json' => $changes,
                 'note'         => $request->input('catatan_histori'),
@@ -350,39 +330,55 @@ private function columnKinds(string $table): array
 
     public function destroy(AssetAc $ac)
     {
+        // catat histori delete
+        $userName = auth()->user()->name ?? 'System';
+        AssetHistory::create([
+            'asset_type'   => 'ac',
+            'asset_id'     => $ac->{$this->pk},
+            'action'       => 'delete',
+            'changes_json' => null,
+            'note'         => null,
+            'edited_by'    => $userName,
+            'created_at'   => now('Asia/Jakarta'),
+        ]);
+
         $ac->delete();
         return redirect()->route('inventory.ac.index')->with('success','Aset AC berhasil dihapus.');
     }
 
     public function show(AssetAc $ac)
     {
-        return view('inventory.ac._detail', ['data' => $ac]);
+        // kirim histori seperti PC/Printer/Proyektor
+        $histories = AssetHistory::where('asset_type','ac')
+            ->where('asset_id', $ac->{$this->pk})
+            ->orderBy('created_at','desc')
+            ->limit(100)
+            ->get();
+
+        return view('inventory.ac._detail', [
+            'data'      => $ac,
+            'histories' => $histories,
+        ]);
     }
 
-    // =============== NEW: IMPORT CSV ===============
-
-    /** Form import CSV */
+    // =============== IMPORT CSV ===============
     public function importForm()
     {
         return view('inventory.ac.import');
     }
 
-    /** Download template CSV mengikuti kolom tabel & langsung attachment */
     public function downloadTemplate()
     {
-        // Header sesuai tabel (tanpa created_at/updated_at)
         $headers = [
             'id_ac','unit_kerja','ruang','tipe_asset','merk',
             'ukuran_pk','kondisi','remote','tahun_pembelian','keterangan'
         ];
 
-        // 1 baris contoh
         $sample = [
             'AC01','Lab Komputer 1','1103','AC','LG HS-C186C4A1','2 PK','Normal',
             'Ada','2019','-'
         ];
 
-        // Buat CSV aman (quote jika perlu)
         $toCsvLine = function(array $fields): string {
             $escaped = array_map(function($v) {
                 $v = (string)$v;
@@ -403,15 +399,10 @@ private function columnKinds(string $table): array
         ]);
     }
 
-    /**
-     * Proses import CSV ke tabel asset_ac
-     * - mode: upsert | insert_only
-     * - auto_add_columns: jika header belum ada di DB, otomatis dibuat (STRING nullable)
-     */
     public function importStore(Request $request)
     {
         $data = $request->validate([
-            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'], // 5MB
+            'csv' => ['required','file','mimetypes:text/plain,text/csv,application/vnd.ms-excel','max:5120'],
             'mode' => ['required','in:upsert,insert_only'],
             'auto_add_columns' => ['nullable','boolean'],
         ]);
@@ -430,20 +421,17 @@ private function columnKinds(string $table): array
             return back()->with('error','Gagal membuka file CSV.');
         }
 
-        // Deteksi delimiter sederhana dari baris pertama
         $firstLine = fgets($fh) ?: '';
         $delimiter = (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
         rewind($fh);
 
-        // Baca header
         $headers = fgetcsv($fh, 0, $delimiter);
         if (!$headers || count($headers) === 0) {
             fclose($fh);
             return back()->with('error','Header CSV tidak ditemukan.');
         }
 
-        // Normalisasi header & simpan index yang valid (tidak kosong)
-        $keepIdx = [];
+        $keepIdx     = [];
         $normHeaders = [];
         foreach ($headers as $i => $h) {
             $norm = $this->normalize((string)$h);
@@ -458,9 +446,8 @@ private function columnKinds(string $table): array
             return back()->with('error','Semua header kosong/tidak valid setelah normalisasi.');
         }
 
-        // Cek kolom yang belum ada
         $existingCols = Schema::getColumnListing($this->table);
-        $unknown = array_values(array_diff($normHeaders, $existingCols));
+        $unknown      = array_values(array_diff($normHeaders, $existingCols));
 
         if (!empty($unknown)) {
             if ($allowAutoCol) {
@@ -476,41 +463,35 @@ private function columnKinds(string $table): array
             }
         }
 
-        // Kolom yang boleh diisi (hindari created_at/updated_at)
-        $skip = ['created_at','updated_at'];
+        $skip     = ['created_at','updated_at'];
         $writable = array_values(array_diff($existingCols, $skip));
 
         $inserted = 0;
         $updated  = 0;
         $skipped  = 0;
         $errors   = [];
-        $rowNum   = 1; // header = baris 1
+        $rowNum   = 1;
 
         DB::beginTransaction();
         try {
             while (($row = fgetcsv($fh, 0, $delimiter)) !== false) {
                 $rowNum++;
 
-                // Lewati baris kosong
                 if (count(array_filter($row, fn($v)=>trim((string)$v)!=='')) === 0) {
                     continue;
                 }
 
-                // Ambil hanya nilai pada index header valid
                 $rowKept = [];
                 foreach ($keepIdx as $j => $idx) {
                     $rowKept[$j] = $row[$idx] ?? null;
                 }
 
-                // Pad jika kurang
                 if (count($rowKept) < count($normHeaders)) {
                     $rowKept = array_pad($rowKept, count($normHeaders), null);
                 }
 
-                // Gabungkan header->value
                 $assoc = array_combine($normHeaders, $rowKept);
 
-                // Wajib id_ac
                 $id = trim((string)($assoc[$this->pk] ?? ''));
                 if ($id === '') {
                     $skipped++;
@@ -518,13 +499,11 @@ private function columnKinds(string $table): array
                     continue;
                 }
 
-                // Casting ringan
                 if (isset($assoc['tahun_pembelian'])) {
                     $tp = trim((string)$assoc['tahun_pembelian']);
                     $assoc['tahun_pembelian'] = ($tp === '' ? null : (int)$tp);
                 }
 
-                // Bersihkan string kosong -> null
                 foreach ($assoc as $k => $v) {
                     if (is_string($v)) {
                         $v = trim($v);
@@ -532,22 +511,14 @@ private function columnKinds(string $table): array
                     }
                 }
 
-                // Filter hanya kolom yang ada di DB
                 $payload = array_intersect_key($assoc, array_flip($writable));
-
-                // Pastikan primary key ada
                 $payload[$this->pk] = $id;
 
-                // INSERT / UPSERT
                 if ($mode === 'upsert') {
                     $exists = AssetAc::where($this->pk,$id)->exists();
-                    AssetAc::updateOrCreate(
-                        [$this->pk => $id],
-                        $payload
-                    );
+                    AssetAc::updateOrCreate([$this->pk => $id], $payload);
                     $exists ? $updated++ : $inserted++;
                 } else {
-                    // insert only — skip jika sudah ada
                     $exists = AssetAc::where($this->pk,$id)->exists();
                     if ($exists) {
                         $skipped++;

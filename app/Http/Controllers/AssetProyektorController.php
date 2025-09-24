@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
 class AssetProyektorController extends Controller
 {
@@ -37,16 +36,14 @@ class AssetProyektorController extends Controller
     private function normalize(string $name): string
     {
         $name = trim($name);
-        if ($name === '') return ''; // <— abaikan header kosong
+        if ($name === '') return ''; // abaikan header kosong
 
         $k = Str::snake($name);
         $k = preg_replace('/[^a-z0-9_]/', '_', strtolower($k));
         $k = preg_replace('/_{2,}/', '_', trim($k, '_'));
 
-        if ($k === '') return '';         // <— tetap abaikan jika habis disaring
-        if (preg_match('/^\d/', $k)) {    // jika diawali angka, prefiks aman
-            $k = 'x_'.$k;
-        }
+        if ($k === '') return '';
+        if (preg_match('/^\d/', $k)) $k = 'x_'.$k; // prefiks aman bila diawali angka
         return $k;
     }
 
@@ -54,28 +51,24 @@ class AssetProyektorController extends Controller
     private function ensureColumns(array $defs): array
     {
         $added = [];
-    foreach ($defs as $d) {
-        $col      = $this->normalize($d['name'] ?? '');
-        $type     = $d['type'] ?? 'string';
-        $nullable = (bool)($d['nullable'] ?? true);
+        foreach ($defs as $d) {
+            $col      = $this->normalize($d['name'] ?? '');
+            $type     = $d['type'] ?? 'string';
+            $nullable = (bool)($d['nullable'] ?? true);
 
-        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
-        if (Schema::hasColumn($this->table, $col)) continue;
+            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+            if (in_array($col, $this->std, true)) continue; // lindungi kolom standar
+            if (Schema::hasColumn($this->table, $col)) continue;
 
-        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-            $method = self::TYPE_MAP[$type];
-        $colDef = $table->{$method}($col);
+            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+                $method = self::TYPE_MAP[$type];
+                $colDef = $table->{$method}($col);
+                if ($nullable) $colDef->nullable();
+            });
 
-        if ($nullable) {
-            $colDef->nullable();
+            $added[] = $col;
         }
-    });
-
-
-        $added[] = $col;
-    }
-    return $added;
+        return $added;
     }
 
     public function addColumn(Request $request)
@@ -92,73 +85,71 @@ class AssetProyektorController extends Controller
             'nullable' => $request->boolean('nullable'),
         ]]);
 
-
         return back()->with('success', 'Kolom baru berhasil ditambahkan.');
     }
 
     public function renameColumn(Request $request)
-{
-    $data = $request->validate([
-        'from' => ['required','string','max:64'],
-        'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
-    ]);
+    {
+        $data = $request->validate([
+            'from' => ['required','string','max:64'],
+            'to'   => ['required','string','max:64','different:from','regex:/^[A-Za-z][A-Za-z0-9_]*$/'],
+        ]);
 
-    $from = $this->normalize($data['from']);
-    $to   = $this->normalize($data['to']);
+        $from = $this->normalize($data['from']);
+        $to   = $this->normalize($data['to']);
 
-    if ($from === '' || $to === '') {
-        return back()->with('error','Nama kolom tidak valid.');
+        if ($from === '' || $to === '') {
+            return back()->with('error','Nama kolom tidak valid.');
+        }
+
+        // lindungi kolom standar
+        $protected = $this->std ?? [];
+        if (in_array($from, $protected, true)) {
+            return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+        }
+
+        if (!Schema::hasColumn($this->table, $from)) {
+            return back()->with('error',"Kolom '$from' tidak ditemukan.");
+        }
+
+        if (Schema::hasColumn($this->table, $to)) {
+            return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
+        }
+
+        // Renaming butuh doctrine/dbal
+        Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
+            $table->renameColumn($from, $to);
+        });
+
+        return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
     }
 
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($from, $protected, true)) {
-        return back()->with('error','Tidak boleh mengubah nama kolom standar.');
+    /** DROP kolom dinamis */
+    public function dropColumn(Request $request)
+    {
+        $data = $request->validate([
+            'name' => ['required','string','max:64'],
+        ]);
+
+        $col = $this->normalize($data['name']);
+        if ($col === '') return back()->with('error','Nama kolom tidak valid.');
+
+        // lindungi kolom standar
+        $protected = $this->std ?? [];
+        if (in_array($col, $protected, true)) {
+            return back()->with('error','Tidak boleh menghapus kolom standar.');
+        }
+
+        if (!Schema::hasColumn($this->table, $col)) {
+            return back()->with('error',"Kolom '$col' tidak ditemukan.");
+        }
+
+        Schema::table($this->table, function (Blueprint $table) use ($col) {
+            $table->dropColumn($col);
+        });
+
+        return back()->with('success',"Kolom '$col' berhasil dihapus.");
     }
-
-    if (!Schema::hasColumn($this->table, $from)) {
-        return back()->with('error',"Kolom '$from' tidak ditemukan.");
-    }
-
-    if (Schema::hasColumn($this->table, $to)) {
-        return back()->with('error',"Nama tujuan '$to' sudah dipakai.");
-    }
-
-    // Renaming butuh doctrine/dbal
-    // composer require doctrine/dbal
-    Schema::table($this->table, function (Blueprint $table) use ($from, $to) {
-        $table->renameColumn($from, $to);
-    });
-
-    return back()->with('success',"Kolom '$from' berhasil diubah menjadi '$to'.");
-}
-
-/** DROP kolom dinamis */
-public function dropColumn(Request $request)
-{
-    $data = $request->validate([
-        'name' => ['required','string','max:64'],
-    ]);
-
-    $col = $this->normalize($data['name']);
-    if ($col === '') return back()->with('error','Nama kolom tidak valid.');
-
-    // lindungi kolom standar
-    $protected = $this->std ?? [];
-    if (in_array($col, $protected, true)) {
-        return back()->with('error','Tidak boleh menghapus kolom standar.');
-    }
-
-    if (!Schema::hasColumn($this->table, $col)) {
-        return back()->with('error',"Kolom '$col' tidak ditemukan.");
-    }
-
-    Schema::table($this->table, function (Blueprint $table) use ($col) {
-        $table->dropColumn($col);
-    });
-
-    return back()->with('success',"Kolom '$col' berhasil dihapus.");
-}
 
     private function extraColumns(): array
     {
@@ -167,34 +158,33 @@ public function dropColumn(Request $request)
     }
 
     private function columnKinds(string $table): array
-{
-    $cols = \Schema::getColumnListing($table);
-    $dateCols = [];
-    $datetimeCols = [];
+    {
+        $cols = \Schema::getColumnListing($table);
+        $dateCols = [];
+        $datetimeCols = [];
 
-    try {
-        $sm = \DB::connection()->getDoctrineSchemaManager();
-        $dt = $sm->listTableDetails($table);
-        foreach ($cols as $c) {
-            $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
-            if ($t === 'date') $dateCols[] = $c;
-            if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        try {
+            $sm = \DB::connection()->getDoctrineSchemaManager();
+            $dt = $sm->listTableDetails($table);
+            foreach ($cols as $c) {
+                $t = $dt->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
+                if ($t === 'date') $dateCols[] = $c;
+                if (in_array($t, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+            }
+        } catch (\Throwable $e) {
+            // fallback: tebak dari nama kolom
+            foreach ($cols as $c) {
+                if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
+                if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
+            }
         }
-    } catch (\Throwable $e) {
-        // fallback: tebak dari nama kolom kalau doctrine/dbal belum dipasang
-        foreach ($cols as $c) {
-            if (preg_match('/(^tanggal_|_date$)/', $c)) $dateCols[] = $c;
-            if (preg_match('/(_at$|_datetime$|^waktu_)/', $c)) $datetimeCols[] = $c;
-        }
+
+        // jangan kirim timestamps
+        $dateCols = array_values(array_diff($dateCols, ['created_at','updated_at']));
+        $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+        return compact('dateCols','datetimeCols');
     }
-
-    // jangan kirim timestamps
-    $dateCols = array_values(array_diff($dateCols, ['created_at','updated_at']));
-    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
-
-    return compact('dateCols','datetimeCols');
-}
-
 
     // =============== INDEX ===============
     public function index(Request $request)
@@ -277,7 +267,7 @@ public function dropColumn(Request $request)
         }
 
         $statusOptions = config('inventory.status_options');
-        $kinds = $this->columnKinds($this->table); 
+        $kinds = $this->columnKinds($this->table);
 
         return view('inventory.proyektor.form', [
             'mode'=>'create',
@@ -316,7 +306,7 @@ public function dropColumn(Request $request)
         }
 
         $statusOptions = config('inventory.status_options');
-        $kinds = $this->columnKinds($this->table); 
+        $kinds = $this->columnKinds($this->table);
 
         return view('inventory.proyektor.form', [
             'mode'=>'edit',
@@ -369,21 +359,41 @@ public function dropColumn(Request $request)
     {
         $userName = auth()->user()->name ?? 'System';
         AssetHistory::create([
-        'asset_type'   => 'proyektor',
-        'asset_id'     => $proyektor->{$this->pk},
-        'action'       => 'delete',
-        'changes_json' => null,
-        'note'         => null,
-        'edited_by'    => $userName, // 👈 ditambah
-        'created_at'   => now('Asia/Jakarta'),
-    ]);
+            'asset_type'   => 'proyektor',
+            'asset_id'     => $proyektor->{$this->pk},
+            'action'       => 'delete',
+            'changes_json' => null,
+            'note'         => null,
+            'edited_by'    => $userName,
+            'created_at'   => now('Asia/Jakarta'),
+        ]);
+
         $proyektor->delete();
         return redirect()->route('inventory.proyektor.index')->with('success','Aset Proyektor berhasil dihapus.');
     }
 
-    public function show(AssetProyektor $proyektor)
+    public function show(Request $request, AssetProyektor $proyektor)
     {
-        return view('inventory.proyektor._detail', ['data' => $proyektor]);
+        // Kirim histori ke view
+        $histories = AssetHistory::where('asset_type','proyektor')
+            ->where('asset_id', $proyektor->{$this->pk})
+            ->orderBy('created_at','desc')
+            ->limit(100)
+            ->get();
+
+        // Jika dipanggil dari modal (AJAX) / ?readonly=1 → partial
+        if ($request->ajax() || $request->boolean('readonly')) {
+            return view('inventory.proyektor._detail', [
+                'data'      => $proyektor,
+                'histories' => $histories,
+            ]);
+        }
+
+        // Halaman penuh
+        return view('inventory.proyektor.show', [
+            'data'      => $proyektor,
+            'histories' => $histories,
+        ]);
     }
 
     // =============== IMPORT CSV ===============
@@ -429,10 +439,7 @@ public function dropColumn(Request $request)
     }
 
     /**
-     * Import CSV:
-     *  - mode: upsert | insert_only
-     *  - auto_add_columns: buat kolom baru otomatis (STRING nullable)
-     *  - Mengabaikan header kosong agar tidak membuat kolom bernama ''.
+     * Import CSV
      */
     public function importStore(Request $request)
     {
@@ -468,9 +475,9 @@ public function dropColumn(Request $request)
             return back()->with('error','Header CSV tidak ditemukan.');
         }
 
-        // Normalisasi + BUANG header kosong
+        // Normalisasi + buang header kosong
         $normHeaders = array_map(fn($h) => $this->normalize((string)$h), $rawHeaders);
-        $normHeaders = array_values(array_filter($normHeaders, fn($h) => $h !== '')); // <— kunci fix
+        $normHeaders = array_values(array_filter($normHeaders, fn($h) => $h !== ''));
 
         // Cek kolom yang belum ada
         $existingCols = Schema::getColumnListing($this->table);
@@ -511,13 +518,10 @@ public function dropColumn(Request $request)
                     continue;
                 }
 
-                // Jika jumlah kolom > header karena ada header kosong yang dibuang,
-                // kita potong ke jumlah header normalisasi:
+                // Sesuaikan jumlah kolom dengan header normalisasi
                 if (count($row) > count($normHeaders)) {
                     $row = array_slice($row, 0, count($normHeaders));
                 }
-
-                // Pad jika kurang
                 if (count($row) < count($normHeaders)) {
                     $row = array_pad($row, count($normHeaders), null);
                 }

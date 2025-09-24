@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 
-
 class AssetPcController extends Controller
 {
     /** Nama tabel & primary key */
@@ -64,69 +63,64 @@ class AssetPcController extends Controller
     /** Tambahkan kolom baru bila belum ada */
     private function ensureColumns(array $defs): array
     {
-        // $defs: [ ['name'=>'umur_baterai','type'=>'integer','nullable'=>true], ... ]
-       $added = [];
-    foreach ($defs as $d) {
-        $col      = $this->normalize($d['name'] ?? '');
-        $type     = $d['type'] ?? 'string';
-        $nullable = (bool)($d['nullable'] ?? true);
+        $added = [];
+        foreach ($defs as $d) {
+            $col      = $this->normalize($d['name'] ?? '');
+            $type     = $d['type'] ?? 'string';
+            $nullable = (bool)($d['nullable'] ?? true);
 
-        if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
-        if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
-        if (Schema::hasColumn($this->table, $col)) continue;
+            if ($col === '' || !isset(self::TYPE_MAP[$type])) continue;
+            if (in_array($col, $this->std, true)) continue;            // tetap lindungi kolom standar
+            if (Schema::hasColumn($this->table, $col)) continue;
 
-        Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
-            $method = self::TYPE_MAP[$type];
-            $colDef = $table->{$method}($col);
+            Schema::table($this->table, function (Blueprint $table) use ($col, $type, $nullable) {
+                $method = self::TYPE_MAP[$type];
+                $colDef = $table->{$method}($col);
+                if ($nullable) $colDef->nullable();
+            });
 
-            if ($nullable) {
-                $colDef->nullable();
-            }
-        });
-
-
-        $added[] = $col;
-    }
-    return $added;
+            $added[] = $col;
+        }
+        return $added;
     }
 
     private function columnKinds(string $table): array
-{
-    // default fallback: tebak dari nama kolom (kalau tidak ada doctrine/dbal)
-    $guessIsDate = function($name) {
-        return preg_match('/(^tanggal_|_date$)/', $name);
-    };
-    $guessIsDatetime = function($name) {
-        return preg_match('/(_at$|^waktu_|_datetime$)/', $name);
-    };
+    {
+        // default fallback: tebak dari nama kolom (kalau tidak ada doctrine/dbal)
+        $guessIsDate = function($name) {
+            return preg_match('/(^tanggal_|_date$)/', $name);
+        };
+        $guessIsDatetime = function($name) {
+            return preg_match('/(_at$|^waktu_|_datetime$)/', $name);
+        };
 
-    $cols = \Schema::getColumnListing($table);
-    $dateCols = [];
-    $datetimeCols = [];
+        $cols = \Schema::getColumnListing($table);
+        $dateCols = [];
+        $datetimeCols = [];
 
-    // coba pakai doctrine/dbal (lebih akurat)
-    try {
-        $sm = \DB::connection()->getDoctrineSchemaManager();
-        $doctrineTable = $sm->listTableDetails($table);
-        foreach ($cols as $c) {
-            $type = $doctrineTable->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
-            if ($type === 'date') $dateCols[] = $c;
-            if (in_array($type, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+        // coba pakai doctrine/dbal (lebih akurat)
+        try {
+            $sm = \DB::connection()->getDoctrineSchemaManager();
+            $doctrineTable = $sm->listTableDetails($table);
+            foreach ($cols as $c) {
+                $type = $doctrineTable->getColumn($c)->getType()->getName(); // 'date','datetime','string',...
+                if ($type === 'date') $dateCols[] = $c;
+                if (in_array($type, ['datetime','datetimetz'])) $datetimeCols[] = $c;
+            }
+        } catch (\Throwable $e) {
+            // fallback: tebak dari nama kolom
+            foreach ($cols as $c) {
+                if ($guessIsDate($c))     $dateCols[] = $c;
+                if ($guessIsDatetime($c)) $datetimeCols[] = $c;
+            }
         }
-    } catch (\Throwable $e) {
-        // fallback: tebak dari nama kolom
-        foreach ($cols as $c) {
-            if ($guessIsDate($c))     $dateCols[] = $c;
-            if ($guessIsDatetime($c)) $datetimeCols[] = $c;
-        }
+
+        // jangan kirim created_at/updated_at ke view
+        $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
+        $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
+
+        return compact('dateCols','datetimeCols');
     }
-
-    // jangan kirim created_at/updated_at ke view
-    $dateCols     = array_values(array_diff($dateCols, ['created_at','updated_at']));
-    $datetimeCols = array_values(array_diff($datetimeCols, ['created_at','updated_at']));
-
-    return compact('dateCols','datetimeCols');
-}
 
     /** ========== MANAGE KOLOM DINAMIS ========== */
 
@@ -353,7 +347,7 @@ class AssetPcController extends Controller
         $request->validate([
             $this->pk         => 'required|string|unique:'.$this->table.','.$this->pk.','.$pc->{$this->pk}.','.$this->pk,
             'tahun_pembelian' => 'nullable|integer',
-            'status'            => 'nullable|in:In use,In store,Service',
+            'status'          => 'nullable|in:In use,In store,Service',
         ]);
 
         $input  = $request->only($writable);
@@ -372,12 +366,12 @@ class AssetPcController extends Controller
             $userName = auth()->user()->name ?? 'System';
 
             AssetHistory::create([
-                'asset_type'   => 'pc',
+                'asset_type'   => 'PC', // diseragamkan uppercase
                 'asset_id'     => $pc->{$this->pk},
                 'action'       => 'update',
                 'changes_json' => $changes,
                 'note'         => $request->input('catatan_histori'),
-                'edited_by'    => $userName, 
+                'edited_by'    => $userName,
                 'created_at'   => now('Asia/Jakarta'),
             ]);
         }
@@ -387,18 +381,18 @@ class AssetPcController extends Controller
 
     public function destroy(AssetPc $pc)
     {
-
         $userName = auth()->user()->name ?? 'System';
 
-    AssetHistory::create([
-        'asset_type'   => 'pc',
-        'asset_id'     => $pc->{$this->pk},
-        'action'       => 'delete',
-        'changes_json' => null,
-        'note'         => null,
-        'edited_by'    => $userName,  // 👈 ditambah
-        'created_at'   => now('Asia/Jakarta'),
-    ]);
+        AssetHistory::create([
+            'asset_type'   => 'PC', // diseragamkan uppercase
+            'asset_id'     => $pc->{$this->pk},
+            'action'       => 'delete',
+            'changes_json' => null,
+            'note'         => null,
+            'edited_by'    => $userName,
+            'created_at'   => now('Asia/Jakarta'),
+        ]);
+
         $pc->delete();
         return redirect()->route('inventory.pc.index')->with('success','Aset PC berhasil dihapus.');
     }
@@ -410,10 +404,18 @@ class AssetPcController extends Controller
             ['created_at','updated_at']
         ));
 
+        // 🔥 Tambahkan riwayat untuk ditampilkan di detail (modal/read-only)
+        $histories = AssetHistory::whereRaw('UPPER(asset_type) = ?', ['PC'])
+            ->where('asset_id', $pc->{$this->pk})
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
+
         return view('inventory.pc._detail', [
-            'data' => $pc,
-            'cols' => $cols,
-            'pk'   => $this->pk,
+            'data'       => $pc,
+            'cols'       => $cols,
+            'pk'         => $this->pk,
+            'histories'  => $histories, // kirim ke view
         ]);
     }
 

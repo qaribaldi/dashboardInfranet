@@ -1,4 +1,4 @@
-<aside class="w-64 shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen">
+<aside class="w-64 shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 min-h-screen flex flex-col">
   {{-- Header --}}
   <div class="px-4 py-4 flex items-center gap-2 border-b border-gray-200 dark:border-gray-700">
     <a href="{{ route('dashboard') }}" class="inline-flex items-center gap-2">
@@ -16,14 +16,14 @@
     $canProyektor = $u?->can('inventory.proyektor.view');
     $canAc        = $u?->can('inventory.ac.view');
     $canHardware  = $u?->can('inventory.hardware.view');
-    $canLabkom    = $u?->can('inventory.labkom.view');   
+    $canLabkom    = $u?->can('inventory.labkom.view');
 
-    $canAnyAsset  = $canPc || $canPrinter || $canProyektor || $canAc; 
-    $canAnyInv    = $canAnyAsset || $canHardware || $canLabkom;      
+    $canAnyAsset  = $canPc || $canPrinter || $canProyektor || $canAc;
+    $canAnyInv    = $canAnyAsset || $canHardware || $canLabkom;
 
     // Active states
     $isDash   = request()->routeIs('dashboard');
-    $isInvGrp = request()->routeIs('inventory.*'); // buka collapsible saat berada di halaman inventory
+    $isInvGrp = request()->routeIs('inventory.*');
 
     $isAssetActive    = request()->routeIs('inventory.pc.*')
                        || request()->routeIs('inventory.printer.*')
@@ -31,9 +31,10 @@
                        || request()->routeIs('inventory.ac.*');
 
     $isHardwareActive = request()->routeIs('inventory.hardware.*');
-    $isLabkomActive   = request()->routeIs('inventory.labkom.*');      
+    $isLabkomActive   = request()->routeIs('inventory.labkom.*');
   @endphp
 
+  {{-- NAV --}}
   <nav class="p-3">
     {{-- DASHBOARD --}}
     @can('dashboard.view')
@@ -104,4 +105,49 @@
       </details>
     @endif
   </nav>
+
+    {{-- FOOTER: BACKUP CSV (tetap di bawah) --}}
+  @if (Route::has('backup.csv'))
+    @can('backup.download')
+      <div class="mt-auto p-3 border-t border-gray-200 dark:border-gray-700">
+        <details class="group">
+          <summary class="flex items-center justify-between cursor-pointer px-3 py-2 rounded-lg
+                          text-gray-700 dark:text-gray-300 hover:bg-gray-100/70 dark:hover:bg-gray-700/70">
+            <span class="inline-flex items-center gap-2">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 19h14" />
+              </svg>
+              <span>Backup CSV</span>
+            </span>
+            <svg class="h-4 w-4 transition-transform duration-200 group-open:rotate-90" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M9 5l7 7-7 7"/>
+            </svg>
+          </summary>
+
+          <div class="mt-2 ml-7 flex flex-col gap-1 text-sm">
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'asset_pc']) }}">PC</a>
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'asset_printer']) }}">Printer</a>
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'asset_proyektor']) }}">Proyektor</a>
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'asset_ac']) }}">AC</a>
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'inventory_hardware']) }}">Hardware</a>
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'inventory_labkom']) }}">Labkom</a>
+            {{-- Opsional: history --}}
+            <a class="px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+               href="{{ route('backup.csv', ['table' => 'asset_history']) }}">History</a>
+          </div>
+
+          <p class="mt-3 text-[11px] text-gray-500 dark:text-gray-400 px-3">
+            Klik untuk mengunduh CSV per tabel.
+          </p>
+        </details>
+      </div>
+    @endcan
+  @endif
+
 </aside>

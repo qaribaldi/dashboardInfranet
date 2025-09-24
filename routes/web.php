@@ -10,6 +10,8 @@ use App\Http\Controllers\AssetProyektorController;
 use App\Http\Controllers\AssetAcController;
 use App\Http\Controllers\InventoryHardwareController;
 use App\Http\Controllers\InventoryLabkomController; // LABKOM
+use App\Http\Controllers\BackupController;
+
 
 // Admin
 use App\Http\Controllers\Admin\UserManagementController;
@@ -40,6 +42,11 @@ Route::get('/dashboard/metrics', [DashboardController::class, 'metrics'])
 Route::delete('/dashboard/clear-history', [DashboardController::class, 'clearHistory'])
     ->middleware('auth')
     ->name('dashboard.clear-history');
+
+Route::get('/backup/csv', [BackupController::class, 'csv'])
+    ->middleware(['auth','permission:backup.download'])
+    ->name('backup.csv');
+
 
 /**
  * =========================
